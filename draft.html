@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StochiPro Enterprise | Reaction Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        corp: {
+                            50: '#f0f4f8',
+                            100: '#d9e2ec',
+                            200: '#bcccdc',
+                            300: '#9fb3c8',
+                            400: '#829ab1',
+                            500: '#627d98',
+                            600: '#486581',
+                            700: '#334e68',
+                            800: '#243b53',
+                            900: '#102a43',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Enterprise Grid & Table Styles */
+        .table-input {
+            @apply w-full bg-transparent border-b border-transparent focus:border-blue-500 focus:outline-none text-right px-1 font-mono transition-colors;
+        }
+        .table-input:hover {
+            @apply bg-gray-50;
+        }
+        /* Custom Scrollbar for dense data */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+        }
+    </style>
+</head>
+<body class="bg-corp-50 text-slate-800 font-sans h-screen flex flex-col overflow-hidden">
+
+    <!-- Top Navigation Bar -->
+    <header class="bg-corp-900 text-white h-14 flex items-center justify-between px-6 shadow-md z-10 shrink-0">
+        <div class="flex items-center gap-3">
+            <i class="fa-solid fa-atom text-blue-400 text-xl"></i>
+            <span class="font-semibold tracking-wide text-lg">StochiPro <span class="text-blue-400 font-light">Enterprise</span></span>
+        </div>
+        <div class="flex items-center gap-4 text-sm text-corp-200">
+            <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-green-400"></span>
+                <span>System Operational</span>
+            </div>
+            <div class="border-l border-corp-700 h-4 mx-2"></div>
+            <button class="hover:text-white transition"><i class="fa-solid fa-gear"></i> Settings</button>
+            <button class="hover:text-white transition"><i class="fa-solid fa-user-circle"></i> Dr. Chem</button>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <div class="flex flex-1 overflow-hidden">
+        
+        <!-- Sidebar (History / Saved Reactions) -->
+        <aside class="w-64 bg-white border-r border-slate-200 flex flex-col hidden md:flex shrink-0 z-0">
+            <div class="p-4 border-b border-slate-100 bg-slate-50">
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Letzte Projekte</h3>
+            </div>
+            <div class="overflow-y-auto flex-1 p-2 space-y-1">
+                <div class="p-3 bg-blue-50 border-l-4 border-blue-500 rounded-r text-sm cursor-pointer">
+                    <div class="font-medium text-slate-800">Synthese A-204</div>
+                    <div class="text-xs text-slate-500 mt-1">Gestern, 14:30</div>
+                </div>
+                <div class="p-3 hover:bg-slate-50 border-l-4 border-transparent hover:border-slate-300 rounded-r text-sm cursor-pointer transition">
+                    <div class="font-medium text-slate-700">Nitrierung Batch 4</div>
+                    <div class="text-xs text-slate-500 mt-1">23. Nov</div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Central Content -->
+        <main class="flex-1 flex flex-col min-w-0 bg-corp-50 relative">
+            
+            <!-- LLM Input Section -->
+            <div class="p-6 pb-2 shrink-0">
+                <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-1">
+                    <div class="relative">
+                        <textarea id="reactionInput" rows="2" 
+                            class="w-full p-4 pr-32 rounded-md focus:outline-none resize-none text-slate-700 placeholder-slate-400"
+                            placeholder="Beschreiben Sie die Reaktion in natürlicher Sprache... (z.B. 'Synthese von Aspirin aus Salicylsäure und Essigsäureanhydrid')"></textarea>
+                        
+                        <div class="absolute bottom-3 right-3 flex gap-2">
+                            <button onclick="clearAll()" class="px-3 py-1 text-slate-400 hover:text-red-500 text-sm transition" title="Reset">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                            <button onclick="processReactionInput()" 
+                                class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded text-sm font-medium shadow-sm transition flex items-center gap-2">
+                                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                                Analysieren
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <!-- Status Bar for Processing -->
+                <div id="statusLine" class="h-6 mt-2 text-xs flex items-center gap-2 text-slate-500 opacity-0 transition-opacity">
+                    <i class="fa-solid fa-circle-notch fa-spin text-blue-500"></i>
+                    <span id="statusText">Verarbeite Eingabe...</span>
+                </div>
+            </div>
+
+            <!-- Split View: Table & Detail -->
+            <div class="flex-1 overflow-hidden flex flex-col lg:flex-row p-6 pt-2 gap-6">
+                
+                <!-- Left: Calculation Table -->
+                <div class="flex-1 bg-white rounded-lg shadow border border-slate-200 flex flex-col overflow-hidden">
+                    <div class="bg-slate-50 p-3 border-b border-slate-200 flex justify-between items-center">
+                        <h2 class="font-semibold text-slate-700 text-sm uppercase tracking-wide"><i class="fa-solid fa-table-list mr-2"></i> Stöchiometrie Tabelle</h2>
+                        <div class="flex gap-2">
+                            <button class="text-xs bg-white border border-slate-300 px-2 py-1 rounded hover:bg-slate-50 text-slate-600">Export CSV</button>
+                            <button onclick="calculateTable()" class="text-xs bg-corp-800 text-white px-3 py-1 rounded hover:bg-corp-700"><i class="fa-solid fa-calculator mr-1"></i> Berechnen</button>
+                        </div>
+                    </div>
+
+                    <div class="overflow-auto flex-1 relative">
+                        <table class="w-full text-sm text-left">
+                            <thead class="bg-slate-50 text-slate-500 sticky top-0 z-10 shadow-sm">
+                                <tr>
+                                    <th class="py-3 px-4 w-12 text-center">#</th>
+                                    <th class="py-3 px-4 font-semibold">Komponente</th>
+                                    <th class="py-3 px-4 font-semibold w-24 text-right">MW <span class="text-xs font-normal">(g/mol)</span></th>
+                                    <th class="py-3 px-4 font-semibold w-20 text-center">Koeff.</th>
+                                    <th class="py-3 px-4 font-semibold w-32 text-right">Masse <span class="text-xs font-normal">(g)</span></th>
+                                    <th class="py-3 px-4 font-semibold w-32 text-right">Stoffmenge <span class="text-xs font-normal">(mmol)</span></th>
+                                    <th class="py-3 px-4 w-10"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="reactantsBody" class="divide-y divide-slate-100">
+                                <!-- Reactants injected via JS -->
+                            </tbody>
+                            <!-- Separator -->
+                            <tbody class="bg-slate-50 border-y border-slate-200">
+                                <tr>
+                                    <td colspan="7" class="py-1 px-4 text-xs font-bold text-slate-400 text-center uppercase tracking-widest">Produkte</td>
+                                </tr>
+                            </tbody>
+                            <tbody id="productsBody" class="divide-y divide-slate-100">
+                                <!-- Products injected via JS -->
+                            </tbody>
+                        </table>
+                        
+                        <!-- Empty State -->
+                        <div id="emptyState" class="absolute inset-0 flex flex-col items-center justify-center text-slate-400 bg-white/50 backdrop-blur-[2px]">
+                            <i class="fa-solid fa-flask text-4xl mb-3 opacity-20"></i>
+                            <p>Keine Reaktion geladen.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: Details Panel -->
+                <div class="w-full lg:w-80 bg-white rounded-lg shadow border border-slate-200 flex flex-col shrink-0">
+                    <div class="bg-slate-50 p-3 border-b border-slate-200">
+                        <h2 class="font-semibold text-slate-700 text-sm uppercase tracking-wide"><i class="fa-solid fa-circle-info mr-2"></i> Details</h2>
+                    </div>
+                    
+                    <div id="detailPanel" class="p-4 flex flex-col gap-4 overflow-y-auto flex-1 hidden">
+                        <!-- Dynamic Content -->
+                        <div class="flex justify-center p-4 bg-white border border-slate-100 rounded-lg shadow-sm">
+                            <img id="detImg" src="" class="h-32 object-contain" alt="Structure">
+                        </div>
+                        
+                        <div>
+                            <div class="text-xs text-slate-400 uppercase font-bold">Name</div>
+                            <div id="detName" class="text-lg font-bold text-slate-800 leading-tight"></div>
+                            <div id="detFormula" class="text-sm font-mono text-slate-500 mt-1"></div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <div class="bg-slate-50 p-2 rounded border border-slate-100">
+                                <div class="text-[10px] text-slate-400 uppercase">CID</div>
+                                <div id="detCID" class="font-mono text-sm text-blue-600"></div>
+                            </div>
+                            <div class="bg-slate-50 p-2 rounded border border-slate-100">
+                                <div class="text-[10px] text-slate-400 uppercase">Schmelzpunkt</div>
+                                <div id="detMP" class="font-mono text-sm">-</div>
+                            </div>
+                        </div>
+                        
+                        <div class="pt-4 border-t border-slate-100 mt-auto">
+                             <div class="text-[10px] text-slate-400 uppercase mb-1">Gefahren (GHS)</div>
+                             <div class="flex gap-2 text-xl text-slate-600">
+                                 <i class="fa-solid fa-skull-crossbones" title="Giftig"></i>
+                                 <i class="fa-solid fa-fire" title="Entzündlich"></i>
+                                 <i class="fa-solid fa-circle-exclamation" title="Reizend"></i>
+                             </div>
+                             <div class="text-[10px] text-slate-400 italic mt-2">Mockup Daten</div>
+                        </div>
+                    </div>
+
+                    <!-- Empty Detail State -->
+                    <div id="detailEmpty" class="flex-1 flex items-center justify-center text-slate-400 text-sm p-6 text-center italic">
+                        Wählen Sie eine Zeile in der Tabelle aus, um Details zu sehen.
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script>
+        // --- Datenmodell ---
+        let reaction = {
+            reactants: [], // { id, name, cid, mw, coeff, mass (g), moles (mmol), formula }
+            products: []
+        };
+        let selectedId = null;
+
+        // --- Mock LLM Simulation ---
+        // In der echten App würde hier der Aufruf an OpenAI/Gemini stehen.
+        // Das LLM würde JSON zurückgeben: { reactants: [{name, coeff}], products: [{name, coeff}] }
+        async function processReactionInput() {
+            const text = document.getElementById('reactionInput').value;
+            if(!text) return;
+
+            setLoading(true, "Analysiere Textstruktur...");
+
+            // Künstliche Verzögerung für "Processing" Feeling
+            await new Promise(r => setTimeout(r, 800));
+
+            // Einfache Keyword-Erkennung für Demo-Zwecke
+            let mockResult = { reactants: [], products: [] };
+            
+            // Demo Fall 1: Aspirin
+            if(text.toLowerCase().includes('aspirin') || text.toLowerCase().includes('salicyl')) {
+                mockResult.reactants = [{name: 'Salicylic acid', coeff: 1}, {name: 'Acetic anhydride', coeff: 1}];
+                mockResult.products = [{name: 'Aspirin', coeff: 1}, {name: 'Acetic acid', coeff: 1}];
+            } 
+            // Demo Fall 2: Default / Alles andere (Wasserbildung)
+            else {
+                mockResult.reactants = [{name: 'Hydrogen', coeff: 2}, {name: 'Oxygen', coeff: 1}];
+                mockResult.products = [{name: 'Water', coeff: 2}];
+            }
+
+            setLoading(true, "Frage PubChem Datenbank ab...");
+            
+            // Daten anreichern (Fetch)
+            await buildTableData(mockResult);
+            
+            setLoading(false);
+            renderTable();
+        }
+
+        // --- PubChem Integration ---
+        async function buildTableData(llmResult) {
+            reaction.reactants = [];
+            reaction.products = [];
+
+            // Helper um Daten zu holen
+            const fetchCompound = async (item, type) => {
+                try {
+                    // 1. CID suchen
+                    const searchRes = await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${item.name}/cids/JSON`);
+                    const searchJson = await searchRes.json();
+                    const cid = searchJson.IdentifierList?.CID[0]; // Nimm ersten Treffer
+
+                    if(!cid) return null;
+
+                    // 2. Props laden
+                    const propRes = await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/property/MolecularWeight,MolecularFormula,Title/JSON`);
+                    const propJson = await propRes.json();
+                    const props = propJson.PropertyTable.Properties[0];
+
+                    return {
+                        id: crypto.randomUUID(),
+                        type: type,
+                        name: props.Title || item.name,
+                        cid: cid,
+                        formula: props.MolecularFormula,
+                        mw: parseFloat(props.MolecularWeight),
+                        coeff: item.coeff || 1,
+                        mass: 0, // startwert
+                        moles: 0 // startwert
+                    };
+                } catch (e) {
+                    console.error("Fehler bei " + item.name, e);
+                    return {
+                        id: crypto.randomUUID(),
+                        type: type,
+                        name: item.name + " (Fehler)",
+                        cid: null,
+                        formula: "-",
+                        mw: 0,
+                        coeff: item.coeff || 1,
+                        mass: 0, moles: 0
+                    };
+                }
+            };
+
+            // Parallel abarbeiten
+            const rPromises = llmResult.reactants.map(r => fetchCompound(r, 'reactant'));
+            const pPromises = llmResult.products.map(p => fetchCompound(p, 'product'));
+
+            const rRes = await Promise.all(rPromises);
+            const pRes = await Promise.all(pPromises);
+
+            reaction.reactants = rRes.filter(x => x);
+            reaction.products = pRes.filter(x => x);
+        }
+
+        // --- Table Rendering ---
+        function renderTable() {
+            const rBody = document.getElementById('reactantsBody');
+            const pBody = document.getElementById('productsBody');
+            const empty = document.getElementById('emptyState');
+
+            rBody.innerHTML = '';
+            pBody.innerHTML = '';
+
+            if(reaction.reactants.length === 0 && reaction.products.length === 0) {
+                empty.classList.remove('hidden');
+                return;
+            }
+            empty.classList.add('hidden');
+
+            const createRow = (item) => {
+                const tr = document.createElement('tr');
+                tr.className = `group hover:bg-blue-50/50 transition border-b border-slate-50 ${selectedId === item.id ? 'bg-blue-50 border-l-2 border-l-blue-500' : ''}`;
+                tr.onclick = (e) => {
+                    // Prevent trigger if clicking input
+                    if(e.target.tagName === 'INPUT') return;
+                    selectRow(item);
+                };
+
+                tr.innerHTML = `
+                    <td class="py-2 text-center text-slate-400 text-xs">${item.type === 'reactant' ? 'E' : 'P'}</td>
+                    <td class="py-2 px-4">
+                        <div class="font-medium text-slate-800">${item.name}</div>
+                        <div class="text-xs text-slate-500 font-mono">${item.formula}</div>
+                    </td>
+                    <td class="py-2 px-4 text-right font-mono text-slate-600">${item.mw.toFixed(2)}</td>
+                    <td class="py-2 px-4 text-center">
+                        <input type="number" value="${item.coeff}" onchange="updateCoeff('${item.id}', this.value)" 
+                        class="w-12 text-center bg-slate-100 rounded border-transparent focus:border-blue-500 focus:bg-white text-xs py-1">
+                    </td>
+                    <td class="py-2 px-4">
+                        <input type="number" step="0.01" placeholder="-" value="${item.mass > 0 ? item.mass.toFixed(2) : ''}" 
+                        onchange="userChangedMass('${item.id}', this.value)"
+                        class="table-input ${item.type === 'reactant' ? 'text-blue-700 font-bold' : 'text-slate-600'}">
+                    </td>
+                    <td class="py-2 px-4">
+                        <input type="number" step="0.01" placeholder="-" value="${item.moles > 0 ? item.moles.toFixed(2) : ''}"
+                        onchange="userChangedMoles('${item.id}', this.value)"
+                        class="table-input text-slate-500">
+                    </td>
+                    <td class="py-2 px-4 text-center">
+                        <button class="text-slate-300 hover:text-red-500 transition"><i class="fa-solid fa-xmark"></i></button>
+                    </td>
+                `;
+                return tr;
+            };
+
+            reaction.reactants.forEach(r => rBody.appendChild(createRow(r)));
+            reaction.products.forEach(p => pBody.appendChild(createRow(p)));
+        }
+
+        // --- Stöchiometrie Logik ---
+        // Sehr vereinfacht: Wenn eine Stoffmenge geändert wird, berechne alle anderen basierend auf Koeffizienten-Verhältnis.
+        
+        function updateCoeff(id, val) {
+            const item = findItem(id);
+            if(item) {
+                item.coeff = parseFloat(val) || 1;
+                // Recalc based on current moles of this item (assuming it is limiting)
+                if(item.moles > 0) recalculateAll(item);
+            }
+        }
+
+        function userChangedMass(id, val) {
+            const item = findItem(id);
+            if(!item) return;
+            const mass = parseFloat(val);
+            if(isNaN(mass)) return;
+
+            // 1. Calculate Moles for this item: n = m / M (using grams and g/mol -> mol, here display in mmol usually but let's stick to base units logic for now. 
+            // Anzeige sagt mmol, aber wir rechnen intern einfachheitshalber linear.
+            // Sagen wir input ist Gramm.
+            item.mass = mass;
+            item.moles = (mass / item.mw) * 1000; // mol * 1000 = mmol
+            
+            recalculateAll(item);
+        }
+
+        function userChangedMoles(id, val) {
+            const item = findItem(id);
+            if(!item) return;
+            const moles = parseFloat(val); // mmol
+            if(isNaN(moles)) return;
+
+            item.moles = moles;
+            item.mass = (moles / 1000) * item.mw;
+
+            recalculateAll(item);
+        }
+
+        function recalculateAll(sourceItem) {
+            // Verhältnis: n1 / coeff1 = n2 / coeff2
+            // ratio = n_source / coeff_source
+            const ratio = sourceItem.moles / sourceItem.coeff;
+
+            const updateList = (list) => {
+                list.forEach(i => {
+                    if(i.id === sourceItem.id) return; // Skip source
+                    i.moles = ratio * i.coeff;
+                    i.mass = (i.moles / 1000) * i.mw;
+                });
+            };
+
+            updateList(reaction.reactants);
+            updateList(reaction.products);
+            renderTable();
+        }
+
+        // --- UI Interactions ---
+        function findItem(id) {
+            return [...reaction.reactants, ...reaction.products].find(x => x.id === id);
+        }
+
+        function selectRow(item) {
+            selectedId = item.id;
+            renderTable(); // um highlight zu updaten
+            
+            // Detail Panel füllen
+            document.getElementById('detailEmpty').classList.add('hidden');
+            document.getElementById('detailPanel').classList.remove('hidden');
+            
+            document.getElementById('detName').textContent = item.name;
+            document.getElementById('detFormula').textContent = item.formula;
+            document.getElementById('detCID').textContent = item.cid || 'N/A';
+            
+            if(item.cid) {
+                document.getElementById('detImg').src = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${item.cid}/PNG?record_type=2d&image_size=300x300`;
+                fetchPhysicalProps(item.cid);
+            } else {
+                document.getElementById('detImg').src = '';
+            }
+        }
+
+        async function fetchPhysicalProps(cid) {
+            // Kleiner Async fetch für Detailpanel (Schmelzpunkt)
+            const el = document.getElementById('detMP');
+            el.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin text-xs"></i>';
+            try {
+                 const viewUrl = `https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data/compound/${cid}/JSON`;
+                 const resp = await fetch(viewUrl);
+                 const json = await resp.json();
+                 // Ultra-Simpler parser für Demo
+                 const phys = json.Record.Section.find(s => s.TOCHeading === "Chemical and Physical Properties");
+                 if(phys) {
+                     const mp = phys.Section.find(s => s.TOCHeading === "Melting Point");
+                     if(mp && mp.Information) {
+                         el.textContent = mp.Information[0].Value.StringWithMarkup?.[0]?.String || mp.Information[0].Value.Number?.[0] || "-";
+                         return;
+                     }
+                 }
+                 el.textContent = "-";
+            } catch(e) {
+                el.textContent = "n/a";
+            }
+        }
+
+        function setLoading(isLoading, text) {
+            const statusLine = document.getElementById('statusLine');
+            const statusText = document.getElementById('statusText');
+            
+            if(isLoading) {
+                statusLine.classList.remove('opacity-0');
+                statusText.textContent = text;
+            } else {
+                statusLine.classList.add('opacity-0');
+            }
+        }
+
+        function clearAll() {
+            document.getElementById('reactionInput').value = '';
+            reaction.reactants = [];
+            reaction.products = [];
+            renderTable();
+            document.getElementById('detailEmpty').classList.remove('hidden');
+            document.getElementById('detailPanel').classList.add('hidden');
+        }
+
+    </script>
+</body>
+</html>
