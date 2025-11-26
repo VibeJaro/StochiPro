@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StochiPro | Smart Stoichiometry</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+  <header class="bg-slate-900 text-white shadow-md">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <i class="fa-solid fa-atom text-blue-400 text-xl"></i>
+        <div>
+          <div class="text-lg font-semibold">StochiPro</div>
+          <div class="text-xs text-slate-200">AI-gestützte Stöchiometrie</div>
+        </div>
+      </div>
+      <span class="text-sm text-slate-200 flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-emerald-400"></span> Ready</span>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 py-6 grid gap-6 lg:grid-cols-3">
+    <section class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+      <div class="flex items-start gap-3">
+        <textarea id="reactionInput" class="w-full border border-slate-200 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:outline-none min-h-[96px]" placeholder="Beschreiben Sie die Reaktion in natürlicher Sprache... (z.B. '4 g Ethanol, 8 g Essigsäure, Produkt: Essigester')"></textarea>
+        <div class="flex flex-col gap-2">
+          <button id="analyzeBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow-sm flex items-center gap-2" onclick="processInput()">
+            <i class="fa-solid fa-wand-magic-sparkles"></i>
+            Analysieren
+          </button>
+          <button class="text-slate-500 hover:text-red-600 text-sm" onclick="resetUI()">Zurücksetzen</button>
+        </div>
+      </div>
+      <p id="statusText" class="text-sm text-slate-500 mt-2 hidden"></p>
+    </section>
+
+    <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+      <h2 class="font-semibold text-slate-700 mb-2">Prozess-Log</h2>
+      <div id="logList" class="space-y-2 text-sm text-slate-600 max-h-64 overflow-y-auto"></div>
+    </section>
+
+    <section class="lg:col-span-3 bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="font-semibold text-slate-700">Stoffliste</h2>
+        <span id="summary" class="text-sm text-blue-700"></span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-left text-slate-500">
+              <th class="py-2">Rolle</th>
+              <th>Name</th>
+              <th>Formel</th>
+              <th class="text-right">Menge</th>
+              <th class="text-right">Masse (g)</th>
+              <th class="text-right">Stoffmenge (mmol)</th>
+              <th class="text-right">Äquiv.</th>
+              <th class="text-center">Quelle</th>
+            </tr>
+          </thead>
+          <tbody id="componentTable" class="divide-y divide-slate-100"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="lg:col-span-3 bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+      <h2 class="font-semibold text-slate-700 mb-3">Detailansicht</h2>
+      <div id="detailPanel" class="text-sm text-slate-700">Keine Auswahl.</div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
