@@ -1,10 +1,14 @@
 {
   "name": "stochipro",
   "version": "1.0.0",
+  "description": "AI-gestützte Stöchiometrie-Berechnung",
   "type": "module",
+  "main": "server.js",
   "scripts": {
-    "dev": "node server.js",
+    "start": "node server.js",
     "test": "node --test"
   },
-  "dependencies": {}
+  "dependencies": {
+    "express": "^4.19.2"
+  }
 }

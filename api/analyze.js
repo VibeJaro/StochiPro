@@ -1,42 +1,22 @@
-import { analyzeReaction } from '../lib/workflow.js';
+import { analyzeText } from '../lib/analyzer.js';
 
 export default async function handler(req, res) {
-  if (req.method && req.method !== 'POST') {
-    res.statusCode = 405;
-    res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({ error: 'Nur POST erlaubt' }));
-    return;
-  }
-
-  let body = '';
-  for await (const chunk of req) {
-    body += chunk;
-  }
-
-  let payload = {};
-  try {
-    payload = body ? JSON.parse(body) : {};
-  } catch (err) {
-    res.statusCode = 400;
-    res.end(JSON.stringify({ error: 'Ungültiges JSON' }));
-    return;
-  }
-
-  const { input } = payload;
-  if (!input || typeof input !== 'string') {
-    res.statusCode = 400;
-    res.end(JSON.stringify({ error: 'input fehlt' }));
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed' });
     return;
   }
 
   try {
-    const result = await analyzeReaction(input);
-    res.statusCode = 200;
-    res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify(result));
-  } catch (err) {
-    res.statusCode = 500;
-    res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({ error: err.message }));
+    const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    const text = body?.text || '';
+    const prompts = body?.prompts || {};
+    if (!text.trim()) {
+      res.status(400).json({ error: 'Text required' });
+      return;
+    }
+    const result = await analyzeText(text, prompts);
+    res.status(200).json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message || 'Unknown error' });
   }
 }
