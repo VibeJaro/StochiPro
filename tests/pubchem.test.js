@@ -2,6 +2,7 @@ import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { searchCompound } from '../lib/pubchem.js';
 import { analyzeText } from '../lib/analyzer.js';
+import * as pubchem from '../lib/pubchem.js';
 
 test('searchCompound resolves PubChem data for names with hyphens', async () => {
   const responses = new Map([
@@ -60,4 +61,68 @@ test('analyzeText falls back to local dataset when PubChem fails', async () => {
   assert.ok(compound);
   assert.equal(compound.source, 'fallback');
   assert.equal(compound.molecularWeight, 122.17);
+});
+
+test('analyzeText queries PubChem per comma-separated name', async () => {
+  const seen = [];
+  const responses = new Map();
+
+  const setupCompound = (name, cid) => {
+    const base = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound';
+    responses.set(
+      `${base}/name/${encodeURIComponent(name)}/cids/JSON`,
+      { IdentifierList: { CID: [cid] } }
+    );
+    responses.set(
+      `${base}/cid/${cid}/synonyms/JSON`,
+      { InformationList: { Information: [{ Synonym: [name] }] } }
+    );
+    responses.set(
+      `${base}/cid/${cid}/property/MolecularWeight,MolecularFormula,IsomericSMILES/JSON`,
+      {
+        PropertyTable: {
+          Properties: [
+            {
+              MolecularWeight: 1.23,
+              MolecularFormula: 'X',
+              IsomericSMILES: 'Y'
+            }
+          ]
+        }
+      }
+    );
+  };
+
+  setupCompound('ethanol', 1);
+  setupCompound('essigsäure', 2);
+  setupCompound('schwefelsäure', 3);
+
+  const fetchMock = mock.method(globalThis, 'fetch', async (url) => {
+    const key = typeof url === 'string' ? url : url.url;
+    const nameMatch = key.match(/name\/([^/]+)\/cids/);
+    if (nameMatch) {
+      seen.push(decodeURIComponent(nameMatch[1]));
+    }
+
+    if (!responses.has(key)) {
+      throw new Error(`Unexpected request: ${key}`);
+    }
+    const body = responses.get(key);
+    return {
+      ok: true,
+      status: 200,
+      json: async () => body,
+      text: async () => JSON.stringify(body)
+    };
+  });
+
+  const result = await analyzeText('ethanol, essigsäure, schwefelsäure');
+
+  assert.equal(result.components.length, 3);
+  assert.deepEqual(seen, ['ethanol', 'essigsäure', 'schwefelsäure']);
+  assert.equal(result.components[0].name, 'ethanol');
+  assert.equal(result.components[1].name, 'essigsäure');
+  assert.equal(result.components[2].name, 'schwefelsäure');
+
+  fetchMock.mock.restore();
 });
