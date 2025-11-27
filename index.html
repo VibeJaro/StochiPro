@@ -3,75 +3,101 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>StochiPro | Smart Stoichiometry</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <title>StochiPro | AI-Stöchiometrie</title>
   <link rel="stylesheet" href="styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
-<body class="bg-slate-50 text-slate-800 min-h-screen">
-  <header class="bg-slate-900 text-white shadow-md">
-    <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <i class="fa-solid fa-atom text-blue-400 text-xl"></i>
-        <div>
-          <div class="text-lg font-semibold">StochiPro</div>
-          <div class="text-xs text-slate-200">AI-gestützte Stöchiometrie</div>
-        </div>
-      </div>
-      <span class="text-sm text-slate-200 flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-emerald-400"></span> Ready</span>
+<body>
+  <header>
+    <div class="brand">
+      <span style="font-size:1.3rem">⚛︎</span>
+      <div>StochiPro <span style="font-weight:400;color:#93c5fd">Enterprise</span></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:0.75rem;font-size:0.9rem;color:#cbd5e1;">
+      <span style="display:flex;align-items:center;gap:0.3rem;"><span style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block"></span> System aktiv</span>
+      <span style="opacity:0.6">AI-Stöchiometrie</span>
     </div>
   </header>
 
-  <main class="max-w-6xl mx-auto px-4 py-6 grid gap-6 lg:grid-cols-3">
-    <section class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-      <div class="flex items-start gap-3">
-        <textarea id="reactionInput" class="w-full border border-slate-200 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:outline-none min-h-[96px]" placeholder="Beschreiben Sie die Reaktion in natürlicher Sprache... (z.B. '4 g Ethanol, 8 g Essigsäure, Produkt: Essigester')"></textarea>
-        <div class="flex flex-col gap-2">
-          <button id="analyzeBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow-sm flex items-center gap-2" onclick="processInput()">
-            <i class="fa-solid fa-wand-magic-sparkles"></i>
-            Analysieren
-          </button>
-          <button class="text-slate-500 hover:text-red-600 text-sm" onclick="resetUI()">Zurücksetzen</button>
+  <main>
+    <aside class="left panel">
+      <div class="panel-header">Schnellstart</div>
+      <div class="panel-content">
+        <p style="margin-top:0;margin-bottom:0.5rem;color:var(--muted)">Beispielabfragen:</p>
+        <ul class="list">
+          <li>• 4 g Ethanol, 8 g Essigsäure, 14 h kochen</li>
+          <li>• 0.5 mol Benzol + 1.2 mol Chlor</li>
+          <li>• 4-Ethylphenol, katalytisch oxidieren</li>
+        </ul>
+        <div style="margin-top:1rem;display:flex;gap:0.5rem;align-items:center;">
+          <span class="tag">PubChem live</span>
+          <span class="tag" style="background:#e0f2fe;color:#075985">LLM orchestriert</span>
         </div>
       </div>
-      <p id="statusText" class="text-sm text-slate-500 mt-2 hidden"></p>
-    </section>
+    </aside>
 
-    <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-      <h2 class="font-semibold text-slate-700 mb-2">Prozess-Log</h2>
-      <div id="logList" class="space-y-2 text-sm text-slate-600 max-h-64 overflow-y-auto"></div>
-    </section>
-
-    <section class="lg:col-span-3 bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-      <div class="flex items-center justify-between mb-3">
-        <h2 class="font-semibold text-slate-700">Stoffliste</h2>
-        <span id="summary" class="text-sm text-blue-700"></span>
+    <section class="panel" style="display:flex;flex-direction:column;gap:1rem;">
+      <div class="panel-header">AI-Eingabe</div>
+      <div class="panel-content">
+        <label for="reactionInput" style="color:var(--muted);font-weight:600;font-size:0.9rem;">Beschreiben Sie die Reaktion in natürlicher Sprache</label>
+        <textarea id="reactionInput" placeholder="z.B. 4 g Ethanol, 8 g Essigsäure, Produkt: Ethylacetat"></textarea>
+        <div style="margin-top:0.75rem; display:flex; gap:0.75rem; align-items:center;">
+          <button class="button-primary" id="analyzeBtn">Analysieren</button>
+          <button class="button-ghost" id="clearBtn">Zurücksetzen</button>
+          <div id="status" class="status-line" style="display:none;">
+            <span id="statusIcon">⏳</span>
+            <span id="statusText">Verarbeite...</span>
+          </div>
+        </div>
       </div>
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="text-left text-slate-500">
-              <th class="py-2">Rolle</th>
-              <th>Name</th>
-              <th>Formel</th>
-              <th class="text-right">Menge</th>
-              <th class="text-right">Masse (g)</th>
-              <th class="text-right">Stoffmenge (mmol)</th>
-              <th class="text-right">Äquiv.</th>
-              <th class="text-center">Quelle</th>
-            </tr>
-          </thead>
-          <tbody id="componentTable" class="divide-y divide-slate-100"></tbody>
-        </table>
+
+      <div class="panel" style="margin:0 1rem 1rem;">
+        <div class="panel-header">Stöchiometrie</div>
+        <div class="panel-content" style="overflow-x:auto;">
+          <table class="table" id="stoichTable">
+            <thead>
+              <tr>
+                <th>Rolle</th>
+                <th>Name</th>
+                <th>Formel</th>
+                <th>M (g/mol)</th>
+                <th>Coeff.</th>
+                <th>n (mmol)</th>
+                <th>m (g)</th>
+                <th>Äquiv.</th>
+              </tr>
+            </thead>
+            <tbody id="stoichBody">
+              <tr><td colspan="8" style="text-align:center;color:var(--muted);">Noch keine Berechnung durchgeführt.</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
 
-    <section class="lg:col-span-3 bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-      <h2 class="font-semibold text-slate-700 mb-3">Detailansicht</h2>
-      <div id="detailPanel" class="text-sm text-slate-700">Keine Auswahl.</div>
-    </section>
+    <aside class="right panel">
+      <div class="panel-header">Details</div>
+      <div class="panel-content" id="detailPanel">
+        <p id="detailEmpty" style="margin:0;color:var(--muted)">Wählen Sie eine Substanz aus der Tabelle.</p>
+        <div id="detailContent" style="display:none;">
+          <h3 id="detailName" style="margin:0 0 0.3rem;"></h3>
+          <div class="detail-grid">
+            <div><span class="label">Formel</span><strong id="detailFormula"></strong></div>
+            <div><span class="label">CID</span><strong id="detailCid"></strong></div>
+            <div><span class="label">Molmasse</span><strong id="detailM"></strong></div>
+            <div><span class="label">Datenquelle</span><strong id="detailSource"></strong></div>
+          </div>
+          <div style="margin-top:0.75rem;">
+            <span class="label">Log</span>
+            <pre class="log" id="detailLog"></pre>
+          </div>
+        </div>
+      </div>
+    </aside>
   </main>
 
-  <script src="app.js"></script>
+  <script type="module" src="app.js"></script>
 </body>
 </html>
