@@ -6,7 +6,7 @@ const state = {
   showLog: true,
   prompts: {
     primaryPrompt:
-      'Du bist ein Chemie-Extraktionsagent. Extrahiere alle Chemikaliennamen oder CAS-Nummern aus dem Nutzereingabetext. Gib ausschließlich ein JSON-Array mit Strings zurück.',
+      'Du bist ein Chemie-Extraktionsagent für Stöchiometrie. Antworte nur mit JSON-Array von Objekten (name, cas, quantity, unit, role, coefficient, aliases).',
     retryPrompt:
       'Wir haben keine Treffer in PubChem gefunden. Finde eine alternative englische Schreibweise oder CAS-Nummer für die genannte Substanz. Antworte nur mit einem JSON-Array aus Strings.'
   }

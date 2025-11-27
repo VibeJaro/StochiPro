@@ -48,14 +48,28 @@ test('searchCompound resolves PubChem data for names with hyphens', async () => 
 });
 
 test('analyzeText falls back to local dataset when PubChem fails', async () => {
-  const restore = mock.method(globalThis, 'fetch', async () => {
+  const fetchMock = mock.method(globalThis, 'fetch', async () => {
     const err = new Error('network down');
     err.status = 503;
     throw err;
   });
 
-  const result = await analyzeText('5 g 4-Ethylphenol, Produkt: irgendwas');
-  restore.mock.restore();
+  const result = await analyzeText(
+    '5 g 4-Ethylphenol, Produkt: irgendwas',
+    {},
+    {
+      extractFn: async () => ({
+        components: [
+          { name: '4-Ethylphenol', quantity: 5, unit: 'g', role: 'reactant' },
+          { name: 'Produkt', role: 'product' }
+        ],
+        raw: '[{"name":"4-Ethylphenol"}]'
+      }),
+      retryFn: async () => null
+    }
+  );
+
+  fetchMock.mock.restore();
 
   const compound = result.components.find((c) => c.name.toLowerCase().includes('ethylphenol'));
   assert.ok(compound);
@@ -63,7 +77,7 @@ test('analyzeText falls back to local dataset when PubChem fails', async () => {
   assert.equal(compound.molecularWeight, 122.17);
 });
 
-test('analyzeText queries PubChem per comma-separated name', async () => {
+test('analyzeText queries PubChem per LLM component', async () => {
   const seen = [];
   const responses = new Map();
 
@@ -116,7 +130,21 @@ test('analyzeText queries PubChem per comma-separated name', async () => {
     };
   });
 
-  const result = await analyzeText('ethanol, essigsäure, schwefelsäure');
+  const result = await analyzeText(
+    'ethanol, essigsäure, schwefelsäure',
+    {},
+    {
+      extractFn: async () => ({
+        components: [
+          { name: 'ethanol', role: 'reactant' },
+          { name: 'essigsäure', role: 'reactant' },
+          { name: 'schwefelsäure', role: 'reactant' }
+        ],
+        raw: '[{"name":"ethanol"},{"name":"essigsäure"},{"name":"schwefelsäure"}]'
+      }),
+      retryFn: async () => null
+    }
+  );
 
   assert.equal(result.components.length, 3);
   assert.deepEqual(seen, ['ethanol', 'essigsäure', 'schwefelsäure']);

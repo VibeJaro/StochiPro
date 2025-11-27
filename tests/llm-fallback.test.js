@@ -58,10 +58,20 @@ test('analyzeText nutzt LLM-Vorschläge wenn PubChem initial fehlschlägt', asyn
   process.env.OPENAI_API_KEY = 'test-key';
   const { analyzeText } = await import('../lib/analyzer.js');
 
-  const result = await analyzeText('Produkt: Essigester', {
-    primaryPrompt: 'Primärer Testprompt',
-    retryPrompt: 'Zweiter Testprompt'
-  });
+  const result = await analyzeText(
+    'Produkt: Essigester',
+    {
+      primaryPrompt: 'Primärer Testprompt',
+      retryPrompt: 'Zweiter Testprompt'
+    },
+    {
+      extractFn: async () => ({
+        components: [{ name: 'Essigester', role: 'product' }],
+        raw: '[{"name":"Essigester"}]'
+      }),
+      retryFn: llm.retryCompoundName
+    }
+  );
 
   restoreFetch.mock.restore();
 
