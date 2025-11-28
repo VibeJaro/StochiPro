@@ -21,6 +21,10 @@ test('searchCompound resolves PubChem data for names with hyphens', async () => 
           Properties: [{ MolecularWeight: 122.17, MolecularFormula: 'C8H10O', IsomericSMILES: 'C2H5C6H4O' }]
         }
       }
+    ],
+    [
+      'https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data/compound/12345/JSON',
+      { Record: { Section: [] } }
     ]
   ]);
 
@@ -104,6 +108,10 @@ test('analyzeText queries PubChem per LLM component', async () => {
           ]
         }
       }
+    );
+    responses.set(
+      `${base.replace('/rest/pug', '/rest/pug_view')}/data/compound/${cid}/JSON`,
+      { Record: { Section: [] } }
     );
   };
 

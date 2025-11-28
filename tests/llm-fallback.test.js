@@ -19,6 +19,10 @@ test('analyzeText nutzt LLM-Vorschläge wenn PubChem initial fehlschlägt', asyn
     [
       'https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/111/property/MolecularWeight,MolecularFormula,IsomericSMILES/JSON',
       { PropertyTable: { Properties: [{ MolecularWeight: 88.11, MolecularFormula: 'C4H8O2', IsomericSMILES: 'CCOC(=O)C' }] } }
+    ],
+    [
+      'https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data/compound/111/JSON',
+      { Record: { Section: [] } }
     ]
   ]);
 
