@@ -6,9 +6,9 @@ const state = {
   showLog: true,
   prompts: {
     primaryPrompt:
-      'Du bist ein Chemie-Extraktionsagent für Stöchiometrie. Antworte nur mit JSON-Array von Objekten (name, cas, quantity, unit, role, coefficient, aliases).',
+      'Extrahiere nur explizit genannte Stoffe als JSON (name, cas, quantity, unit, role, coefficient, aliases). Erlaubte Rollen: Edukt, Produkt, Lösemittel, Additiv, Katalysator. Keine erfundenen Werte.',
     retryPrompt:
-      'Wir haben keine Treffer in PubChem gefunden. Finde eine alternative englische Schreibweise oder CAS-Nummer für die genannte Substanz. Antworte nur mit einem JSON-Array aus Strings.'
+      'PubChem fand nichts. Nutze den Kontext des fehlgeschlagenen Versuchs und liefere nur alternative Schreibweisen/CAS für die fehlenden Stoffe als JSON-Array von Strings.'
   }
 };
 
@@ -93,6 +93,14 @@ function renderDetail() {
     return;
   }
   const comp = state.components[state.selected];
+  const physical = comp.physicalProperties || {};
+  const densityValue = physical.density || (comp.density ? `${formatNumber(comp.density)} g/mL` : null);
+  const physicalItems = [
+    { label: 'Dichte', value: densityValue },
+    { label: 'Schmelzpunkt', value: physical.meltingPoint },
+    { label: 'Siedepunkt', value: physical.boilingPoint },
+    { label: 'Flammpunkt', value: physical.flashPoint }
+  ].filter((entry) => entry.value);
   panel.innerHTML = `
     <div class="grid grid-cols-2 gap-4">
       <div>
@@ -119,6 +127,16 @@ function renderDetail() {
         <div class="text-xs uppercase text-slate-400">Stoffmenge</div>
         <div>${formatNumber(comp.moles)} mmol</div>
       </div>
+    </div>
+    <div class="mt-4">
+      <div class="text-xs uppercase text-slate-400 mb-1">Physikalische Eigenschaften</div>
+      ${
+        physicalItems.length
+          ? `<ul class="space-y-1">${physicalItems
+              .map((item) => `<li class="flex justify-between"><span class="text-slate-500">${item.label}</span><span class="font-mono">${item.value}</span></li>`)
+              .join('')}</ul>`
+          : '<div class="text-slate-400 text-sm">Keine Angaben.</div>'
+      }
     </div>
   `;
 }
