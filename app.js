@@ -6,9 +6,9 @@ const state = {
   showLog: true,
   prompts: {
     primaryPrompt:
-      'Du bist ein Chemie-Extraktionsagent für Stöchiometrie. Antworte nur mit JSON-Array von Objekten (name, cas, quantity, unit, role, coefficient, aliases).',
+      'Du bist ein Chemie-Extraktionsagent für Stöchiometrie. Antworte nur mit JSON-Array von Objekten (name, cas, quantity, unit, role=edukt|produkt|lösemittel|additiv|katalysator, coefficient). Trage nur Werte ein, die explizit im Text stehen.',
     retryPrompt:
-      'Wir haben keine Treffer in PubChem gefunden. Finde eine alternative englische Schreibweise oder CAS-Nummer für die genannte Substanz. Antworte nur mit einem JSON-Array aus Strings.'
+      'Wir haben keine Treffer in PubChem gefunden. Nutze den Kontext des ersten fehlgeschlagenen Versuchs, um NUR für fehlende Stoffe eine alternative Schreibweise oder CAS zu liefern. Antworte nur mit einem JSON-Array aus Strings.'
   }
 };
 
@@ -93,6 +93,13 @@ function renderDetail() {
     return;
   }
   const comp = state.components[state.selected];
+  const phys = comp.physicalProperties || {};
+  const densityLabel =
+    comp.density && phys.densityUnit
+      ? `${formatNumber(comp.density, 3)} ${phys.densityUnit}`
+      : comp.density
+        ? `${formatNumber(comp.density, 3)} g/mL`
+        : phys.densityRaw || '–';
   panel.innerHTML = `
     <div class="grid grid-cols-2 gap-4">
       <div>
@@ -119,6 +126,27 @@ function renderDetail() {
         <div class="text-xs uppercase text-slate-400">Stoffmenge</div>
         <div>${formatNumber(comp.moles)} mmol</div>
       </div>
+    </div>
+    <div class="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+      <div class="text-xs uppercase text-slate-400">Physikalische Eigenschaften</div>
+      <dl class="grid grid-cols-2 gap-2 mt-2 text-sm">
+        <div>
+          <dt class="text-slate-500">Dichte</dt>
+          <dd class="font-medium">${densityLabel}</dd>
+        </div>
+        <div>
+          <dt class="text-slate-500">Schmelzpunkt</dt>
+          <dd class="font-medium">${phys.meltingPoint || '–'}</dd>
+        </div>
+        <div>
+          <dt class="text-slate-500">Siedepunkt</dt>
+          <dd class="font-medium">${phys.boilingPoint || '–'}</dd>
+        </div>
+        <div>
+          <dt class="text-slate-500">Aussehen</dt>
+          <dd class="font-medium">${phys.appearance || '–'}</dd>
+        </div>
+      </dl>
     </div>
   `;
 }
