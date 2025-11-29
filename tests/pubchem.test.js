@@ -24,7 +24,49 @@ test('searchCompound resolves PubChem data for names with hyphens', async () => 
     ],
     [
       'https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data/compound/12345/JSON',
-      { Record: { Section: [] } }
+      {
+        Record: {
+          Section: [
+            {
+              TOCHeading: 'Description',
+              Information: [
+                {
+                  Value: {
+                    StringWithMarkup: [{ String: 'Mock Beschreibung' }]
+                  }
+                }
+              ]
+            },
+            {
+              TOCHeading: 'Chemical and Physical Properties',
+              Section: [
+                {
+                  TOCHeading: 'Melting Point',
+                  Information: [
+                    { Value: { StringWithMarkup: [{ String: '212 F' }] } }
+                  ]
+                },
+                {
+                  TOCHeading: 'Boiling Point',
+                  Information: [
+                    { Value: { StringWithMarkup: [{ String: '350 K' }] } }
+                  ]
+                },
+                {
+                  TOCHeading: 'Flash Point',
+                  Information: [{ Value: { Number: [32] } }]
+                },
+                {
+                  TOCHeading: 'Density',
+                  Information: [
+                    { Value: { StringWithMarkup: [{ String: '1.1 g/mL' }] } }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
     ]
   ]);
 
@@ -47,6 +89,11 @@ test('searchCompound resolves PubChem data for names with hyphens', async () => 
   assert.equal(result.cid, 12345);
   assert.equal(result.name, 'Mock 4-ethylphenol');
   assert.equal(result.formula, 'C8H10O');
+  assert.equal(result.physicalProperties.meltingPoint, '100 °C');
+  assert.equal(result.physicalProperties.boilingPoint, '76.9 °C');
+  assert.equal(result.physicalProperties.flashPoint, '32 °C');
+  assert.equal(result.description, 'Mock Beschreibung');
+  assert.equal(result.density, 1.1);
 
   restoreFetch.mock.restore();
 });
