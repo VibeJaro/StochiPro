@@ -58,7 +58,13 @@
 
     <section class="lg:col-span-3 bg-white rounded-xl shadow-sm border border-slate-200 p-4">
       <div class="flex items-center justify-between mb-3">
-        <h2 class="font-semibold text-slate-700">Stoffliste</h2>
+        <div class="flex items-center gap-3">
+          <h2 class="font-semibold text-slate-700">Stoffliste</h2>
+          <button onclick="addManualRow()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-1 rounded">
+            Manuelle Zeile
+          </button>
+          <span class="text-xs text-slate-500">Manuelle Änderungen sind mit einem Punkt gekennzeichnet.</span>
+        </div>
         <span id="summary" class="text-sm text-blue-700"></span>
       </div>
       <div class="overflow-x-auto">
