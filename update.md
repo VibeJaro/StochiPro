@@ -1,6 +1,9 @@
 # Update-Bericht
 
 ## Was wurde geändert?
+- **Neue Detailkarten mit allen PubChem-Punkten:** Die Detailansicht zeigt jetzt SMILES, Wikipedia-Link, XLogP3/LogP, pKa, Kovats-Index sowie alle GHS-, Verwendungs- und Umweltangaben in klar getrennten Karten (Struktur, Physik, Verwendung, Sicherheit, Umwelt).
+- **PubChem-Parser erweitert:** Die PUG-View-Auswertung extrahiert jetzt sämtliche in `data_extraction.md` genannten Felder (u. a. Solubility, Vapor Pressure, Piktogramme, P- und H-Sätze, Hazard Classes, Environmental Fate) und übergibt sie an die UI.
+- **Fallback für 3-Ethylphenol:** Ein lokaler Datensatz mit allen extrahierten PubChem-Werten stellt sicher, dass Tests und Demoansichten (Screenshot) ohne Netzwerkkonnektivität funktionieren.
 - **LLM- & Log-Bereich als Ausklappmenü:** Prompts und Logs wandern in einen eigenen, ausklappbaren Abschnitt. Dort stehen jetzt auch komplette Prompts/Antworten sowie alle PubChem-Requests mit ihren Antworten, um Debugging zu erleichtern.
 - **Detailierter PubChem-Trace:** Jeder PubChem-Versuch protokolliert URLs, Rohantworten und Fehler. So lassen sich Suchstrategien und Treffer nachvollziehen.
 - **Explizite Zeilenauswahl:** Die Stofftabelle hat ein eigenes Auswahlfeld je Zeile. Eine Zeile kann jetzt gezielt angeklickt werden, ohne sofort in ein Eingabefeld zu geraten.
@@ -19,9 +22,10 @@
 - Debugging ist einfacher, weil sämtliche LLM- und PubChem-Aufrufe transparent dokumentiert sind.
 - Nutzerinnen können Zeilen auswählen, ohne versehentlich in die Bearbeitung zu springen.
 - Fehlende Beschreibungen sind sofort erkennbar, vorhandene Beschreibungen werden prominent gezeigt.
+- Alle relevanten Sicherheits-, Umwelt- und Verwendungsangaben aus PubChem sind jetzt sichtbar, wodurch der Agent fachlich vollständiger wird.
 
 ## Wie nutzen?
 1. Reaktionstext eingeben wie bisher.
 2. Falls PubChem einen Stoff nicht sofort findet, versucht die KI automatisch mit mehr Kontext eine alternative Schreibweise.
-3. In der Detailansicht erscheinen jetzt auch Beschreibungen und physikalische Werte; Volumenangaben werden mit Dichte zu Masse/Stoffmenge umgerechnet.
+3. In der Detailansicht erscheinen jetzt Beschreibungen, physikalische Werte, LogP/pKa/Kovats-Index, GHS-Piktogramme, H-/P-Sätze sowie Umwelt- und Use-&-Manufacturing-Informationen; Volumenangaben werden mit Dichte zu Masse/Stoffmenge umgerechnet.
 4. Den Bereich "LLM & Log" nur bei Bedarf ausklappen, um Prompts anzupassen oder komplette LLM-/PubChem-Traces einzusehen.

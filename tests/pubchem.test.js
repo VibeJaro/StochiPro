@@ -51,6 +51,180 @@ test('searchCompound resolves PubChem data for names with hyphens', async () => 
   restoreFetch.mock.restore();
 });
 
+test('searchCompound extrahiert Zusatzfelder aus PubChem-View', async () => {
+  const viewData = {
+    Record: {
+      Section: [
+        {
+          TOCHeading: 'Names and Identifiers',
+          Section: [
+            {
+              TOCHeading: 'Computed Descriptors',
+              Section: [
+                {
+                  TOCHeading: 'SMILES',
+                  Information: [{ Value: { StringWithMarkup: [{ String: 'CCC1=CC(=CC=C1)O' }] } }]
+                }
+              ]
+            },
+            {
+              TOCHeading: 'Other Identifiers',
+              Section: [
+                {
+                  TOCHeading: 'Wikipedia',
+                  Information: [{ URL: [{ URL: 'https://example.com/wiki' }] }]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          TOCHeading: 'Chemical and Physical Properties',
+          Section: [
+            {
+              TOCHeading: 'Computed Properties',
+              Section: [
+                { TOCHeading: 'XLogP3', Information: [{ Value: { Number: [2.4] } }] }
+              ]
+            },
+            {
+              TOCHeading: 'Experimental Properties',
+              Section: [
+                { TOCHeading: 'Physical Description', Information: [{ Value: { StringWithMarkup: [{ String: 'Colorless liquid' }] } }] },
+                { TOCHeading: 'Color/Form', Information: [{ Value: { StringWithMarkup: [{ String: 'COLORLESS LIQUID' }] } }] },
+                { TOCHeading: 'Solubility', Information: [{ Value: { StringWithMarkup: [{ String: 'Very soluble in alcohol' }] } }] },
+                { TOCHeading: 'Vapor Pressure', Information: [{ Value: { StringWithMarkup: [{ String: '0.05 mmHg' }] } }] },
+                { TOCHeading: 'LogP', Information: [{ Value: { Number: [2.4] } }] },
+                { TOCHeading: 'Dissociation Constants', Information: [{ Value: { StringWithMarkup: [{ String: 'pKa 9.9' }] } }] },
+                { TOCHeading: 'Kovats Retention Index', Information: [{ Value: { StringWithMarkup: [{ String: '1140' }] } }] }
+              ]
+            }
+          ]
+        },
+        {
+          TOCHeading: 'Use and Manufacturing',
+          Section: [
+            {
+              TOCHeading: 'Uses',
+              Section: [
+                { TOCHeading: 'Sources/Uses', Information: [{ Value: { StringWithMarkup: [{ String: 'Photochemicals' }] } }] },
+                { TOCHeading: 'Use Classification', Information: [{ Value: { StringWithMarkup: [{ String: 'Fragrance Ingredients' }] } }] },
+                { TOCHeading: 'Industry Uses', Information: [{ Value: { StringWithMarkup: [{ String: 'Cleaning agent' }] } }] },
+                { TOCHeading: 'Consumer Uses', Information: [{ Value: { StringWithMarkup: [{ String: 'Consumer products' }] } }] }
+              ]
+            },
+            {
+              TOCHeading: 'Methods of Manufacturing',
+              Information: [{ Value: { StringWithMarkup: [{ String: 'Sulfonation route' }] } }]
+            }
+          ]
+        },
+        {
+          TOCHeading: 'Safety and Hazards',
+          Section: [
+            {
+              TOCHeading: 'Hazards Identification',
+              Section: [
+                {
+                  TOCHeading: 'GHS Classification',
+                  Section: [
+                    { TOCHeading: 'Pictogram(s)', Information: [{ Value: { StringWithMarkup: [{ String: 'GHS05' }] } }] },
+                    { TOCHeading: 'Signal', Information: [{ Value: { StringWithMarkup: [{ String: 'Danger' }] } }] },
+                    {
+                      TOCHeading: 'GHS Hazard Statements',
+                      Information: [{ Value: { StringWithMarkup: [{ String: 'H314: Causes severe skin burns' }] } }]
+                    },
+                    {
+                      TOCHeading: 'Precautionary Statement Codes',
+                      Information: [{ Value: { StringWithMarkup: [{ String: 'P280' }] } }]
+                    },
+                    {
+                      TOCHeading: 'Hazard Classes and Categories',
+                      Information: [{ Value: { StringWithMarkup: [{ String: 'Skin Corr. 1B' }] } }]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          TOCHeading: 'Ecological Information',
+          Section: [
+            {
+              TOCHeading: 'Environmental Fate/Exposure Summary',
+              Information: [{ Value: { StringWithMarkup: [{ String: 'Degrades in air' }] } }]
+            }
+          ]
+        }
+      ]
+    }
+  };
+
+  const responses = new Map([
+    [
+      'https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/mock-ethylphenol/cids/JSON',
+      { IdentifierList: { CID: [999] } }
+    ],
+    [
+      'https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/999/synonyms/JSON',
+      { InformationList: { Information: [{ Synonym: ['Mock Ethylphenol'] }] } }
+    ],
+    [
+      'https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/999/property/MolecularWeight,MolecularFormula,IsomericSMILES/JSON',
+      {
+        PropertyTable: {
+          Properties: [
+            { MolecularWeight: 122.17, MolecularFormula: 'C8H10O', IsomericSMILES: 'ROW-SMILES' }
+          ]
+        }
+      }
+    ],
+    ['https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data/compound/999/JSON', viewData]
+  ]);
+
+  const restoreFetch = mock.method(globalThis, 'fetch', async (url) => {
+    const key = typeof url === 'string' ? url : url.url;
+    if (!responses.has(key)) {
+      throw new Error(`Unexpected request: ${key}`);
+    }
+    const body = responses.get(key);
+    return {
+      ok: true,
+      status: 200,
+      json: async () => body,
+      text: async () => JSON.stringify(body)
+    };
+  });
+
+  const result = await searchCompound('mock-ethylphenol');
+
+  assert.equal(result.smiles, 'ROW-SMILES');
+  assert.equal(result.pubchemDetails.smiles, 'ROW-SMILES');
+  assert.equal(result.pubchemDetails.wikipedia, 'https://example.com/wiki');
+  assert.equal(result.pubchemDetails.xlogp3, '2.4');
+  assert.equal(result.pubchemDetails.logP, '2.4');
+  assert.equal(result.pubchemDetails.physicalDescription, 'Colorless liquid');
+  assert.equal(result.pubchemDetails.colorForm, 'COLORLESS LIQUID');
+  assert.equal(result.pubchemDetails.solubility, 'Very soluble in alcohol');
+  assert.equal(result.pubchemDetails.vaporPressure, '0.05 mmHg');
+  assert.equal(result.pubchemDetails.pKa, 'pKa 9.9');
+  assert.equal(result.pubchemDetails.kovatsRetentionIndex, '1140');
+  assert.equal(result.pubchemDetails.sourcesUses, 'Photochemicals');
+  assert.equal(result.pubchemDetails.useClassification, 'Fragrance Ingredients');
+  assert.deepEqual(result.pubchemDetails.industryUses, ['Cleaning agent']);
+  assert.deepEqual(result.pubchemDetails.consumerUses, ['Consumer products']);
+  assert.equal(result.pubchemDetails.methodsOfManufacturing, 'Sulfonation route');
+  assert.deepEqual(result.pubchemDetails.pictograms, ['GHS05']);
+  assert.equal(result.pubchemDetails.signal, 'Danger');
+  assert.deepEqual(result.pubchemDetails.hazardStatements, ['H314: Causes severe skin burns']);
+  assert.deepEqual(result.pubchemDetails.precautionaryStatements, ['P280']);
+  assert.deepEqual(result.pubchemDetails.hazardClasses, ['Skin Corr. 1B']);
+  assert.equal(result.pubchemDetails.environmentalFate, 'Degrades in air');
+
+  restoreFetch.mock.restore();
+});
+
 test('analyzeText falls back to local dataset when PubChem fails', async () => {
   const fetchMock = mock.method(globalThis, 'fetch', async () => {
     const err = new Error('network down');

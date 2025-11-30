@@ -317,8 +317,9 @@ function renderDetail() {
   }
   const comp = state.components[state.selected];
   const physical = comp.physicalProperties || {};
+  const detail = comp.pubchemDetails || {};
   const densityValue = physical.density || (comp.density ? `${formatNumber(comp.density)} g/mL` : null);
-  const description = comp.description || physical.description;
+  const description = comp.description || physical.description || detail.physicalDescription;
   const sourceNote =
     comp.wasEdited && comp.originalSource === 'pubchem'
       ? 'Aus PubChem geladen und manuell angepasst.'
@@ -327,59 +328,171 @@ function renderDetail() {
         : comp.source === 'fallback'
           ? 'Fallback-Daten aus dem lokalen Katalog.'
           : 'Manuell gepflegte Werte.';
+
+  const toArray = (value) => (Array.isArray(value) ? value.filter(Boolean) : value ? [value] : []);
+  const renderKeyValueList = (items) =>
+    `<ul class="divide-y divide-slate-100">${items
+      .map(
+        (item) =>
+          `<li class="py-1 flex justify-between gap-4"><span class="text-slate-500">${item.label}</span><span class="text-sm text-right">${
+            item.value && item.value !== '' ? item.value : '–'
+          }</span></li>`
+      )
+      .join('')}</ul>`;
+
+  const renderBulletList = (items, placeholder = 'Keine Angaben.') => {
+    if (items.length) {
+      return `<ul class="list-disc list-inside space-y-1">${items.map((entry) => `<li>${entry}</li>`).join('')}</ul>`;
+    }
+    return `<div class="text-sm text-slate-400">${placeholder}</div>`;
+  };
+
+  const renderPills = (items, placeholder = 'Keine Angaben.') => {
+    if (items.length) {
+      return `<div class="flex flex-wrap gap-2">${items
+        .map((entry) => `<span class="px-2 py-1 bg-slate-100 border border-slate-200 rounded-full text-xs">${entry}</span>`)
+        .join('')}</div>`;
+    }
+    return `<div class="text-sm text-slate-400">${placeholder}</div>`;
+  };
+
   const physicalItems = [
     { label: 'Dichte', value: densityValue },
     { label: 'Schmelzpunkt', value: physical.meltingPoint },
     { label: 'Siedepunkt', value: physical.boilingPoint },
-    { label: 'Flammpunkt', value: physical.flashPoint }
-  ].filter((entry) => entry.value);
+    { label: 'Flammpunkt', value: physical.flashPoint },
+    { label: 'Physikalische Beschreibung', value: detail.physicalDescription },
+    { label: 'Farbe/Form', value: detail.colorForm },
+    { label: 'Löslichkeit', value: detail.solubility },
+    { label: 'Dampfdruck', value: detail.vaporPressure }
+  ];
+
+  const descriptorItems = [
+    { label: 'SMILES', value: comp.smiles || detail.smiles },
+    { label: 'XLogP3', value: detail.xlogp3 },
+    { label: 'LogP (experimentell)', value: detail.logP },
+    { label: 'pKa', value: detail.pKa },
+    { label: 'Kovats-Retentionsindex', value: detail.kovatsRetentionIndex }
+  ];
+
   panel.innerHTML = `
-    <div class="grid grid-cols-2 gap-4">
-      <div>
+    <div class="grid md:grid-cols-3 gap-4">
+      <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-2">
         <div class="text-xs uppercase text-slate-400">Name</div>
-        <div class="font-semibold">${comp.name}</div>
-      </div>
-      <div>
+        <div class="font-semibold text-lg">${comp.name}</div>
         <div class="text-xs uppercase text-slate-400">Formel</div>
         <div>${comp.formula || '–'}</div>
-      </div>
-      <div>
         <div class="text-xs uppercase text-slate-400">Molekulargewicht</div>
         <div>${comp.molecularWeight ? `${formatNumber(comp.molecularWeight)} g/mol` : '–'}</div>
       </div>
-      <div>
+      <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-2">
         <div class="text-xs uppercase text-slate-400">PubChem CID</div>
         <div>${comp.cid || '–'}</div>
-      </div>
-      <div>
         <div class="text-xs uppercase text-slate-400">Masse</div>
         <div>${formatNumber(comp.mass)} g</div>
-      </div>
-      <div>
         <div class="text-xs uppercase text-slate-400">Stoffmenge</div>
         <div>${formatNumber(comp.moles)} mmol</div>
       </div>
+      <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-2">
+        <div class="text-xs uppercase text-slate-400">SMILES</div>
+        <div class="font-mono text-sm break-words">${comp.smiles || detail.smiles || '–'}</div>
+        <div class="text-xs uppercase text-slate-400">Wikipedia</div>
+        <div>
+          ${
+            detail.wikipedia
+              ? `<a class="text-blue-700 hover:underline break-words" href="${detail.wikipedia}" target="_blank" rel="noreferrer">${detail.wikipedia}</a>`
+              : '<span class="text-slate-400">–</span>'
+          }
+        </div>
+      </div>
     </div>
+
     <div class="mt-4 p-3 rounded-lg bg-slate-50 border border-slate-200">
       <div class="text-xs uppercase text-slate-400 mb-1">Quelle</div>
       <div class="text-sm text-slate-700">${sourceNote}</div>
     </div>
-    ${
-      description
-        ? `<div class="mt-4">
-            <div class="text-xs uppercase text-slate-400 mb-1">Beschreibung</div>
-            <div class="text-sm text-slate-700 leading-relaxed">${description}</div>
-          </div>`
-        : '<div class="mt-4 text-sm text-slate-500">Keine Beschreibung gefunden.</div>'
-    }
-    <div class="mt-4">
-      <div class="text-xs uppercase text-slate-400 mb-1">Physikalische Eigenschaften</div>
+
+    <div class="mt-4 grid lg:grid-cols-2 gap-4">
+      <div class="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="font-semibold text-slate-700">Beschreibung & Physik</h3>
+          <span class="text-xs text-slate-500">PubChem Experimental</span>
+        </div>
+        ${
+          description
+            ? `<div class="text-sm text-slate-700 leading-relaxed">${description}</div>`
+            : '<div class="text-sm text-slate-400">Keine Beschreibung gefunden.</div>'
+        }
+        ${renderKeyValueList(physicalItems)}
+      </div>
+      <div class="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="font-semibold text-slate-700">Struktur & Verteilung</h3>
+          <span class="text-xs text-slate-500">LogP / pKa / Retention</span>
+        </div>
+        ${renderKeyValueList(descriptorItems)}
+      </div>
+    </div>
+
+    <div class="mt-4 grid lg:grid-cols-2 gap-4">
+      <div class="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="font-semibold text-slate-700">Verwendung & Herstellung</h3>
+          <span class="text-xs text-slate-500">Use & Manufacturing</span>
+        </div>
+        ${renderKeyValueList([
+          { label: 'Sources/Uses', value: detail.sourcesUses },
+          { label: 'Use Classification', value: detail.useClassification },
+          { label: 'Methods of Manufacturing', value: detail.methodsOfManufacturing }
+        ])}
+        <div>
+          <div class="text-xs uppercase text-slate-400">Industrieeinsatz</div>
+          ${renderPills(toArray(detail.industryUses))}
+        </div>
+        <div>
+          <div class="text-xs uppercase text-slate-400">Consumer Uses</div>
+          ${renderPills(toArray(detail.consumerUses))}
+        </div>
+      </div>
+      <div class="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="font-semibold text-slate-700">Sicherheit (GHS)</h3>
+          <span class="text-xs text-slate-500">Hazard Statements & Codes</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs uppercase text-slate-400">Signalwort</span>
+          <span class="px-2 py-1 rounded-full text-xs ${detail.signal ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-slate-100 text-slate-500'}">${
+            detail.signal || '–'
+          }</span>
+        </div>
+        <div>
+          <div class="text-xs uppercase text-slate-400">Piktogramme</div>
+          ${renderPills(toArray(detail.pictograms))}
+        </div>
+        <div>
+          <div class="text-xs uppercase text-slate-400">GHS Hazard Statements (H-Sätze)</div>
+          ${renderBulletList(toArray(detail.hazardStatements))}
+        </div>
+        <div>
+          <div class="text-xs uppercase text-slate-400">Precautionary Statement Codes (P-Sätze)</div>
+          ${renderPills(toArray(detail.precautionaryStatements))}
+        </div>
+        <div>
+          <div class="text-xs uppercase text-slate-400">Gefahrklassen & Kategorien</div>
+          ${renderBulletList(toArray(detail.hazardClasses))}
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-4 bg-white border border-slate-200 rounded-lg p-4 space-y-2">
+      <div class="flex items-center justify-between">
+        <h3 class="font-semibold text-slate-700">Umweltfate / Exposition</h3>
+        <span class="text-xs text-slate-500">Ecological Information</span>
+      </div>
       ${
-        physicalItems.length
-          ? `<ul class="space-y-1">${physicalItems
-              .map((item) => `<li class="flex justify-between"><span class="text-slate-500">${item.label}</span><span class="font-mono">${item.value}</span></li>`)
-              .join('')}</ul>`
-          : '<div class="text-slate-400 text-sm">Keine Angaben.</div>'
+        detail.environmentalFate
+          ? `<div class="text-sm text-slate-700 leading-relaxed">${detail.environmentalFate}</div>`
+          : '<div class="text-sm text-slate-400">Keine Umweltangaben gefunden.</div>'
       }
     </div>
   `;
@@ -432,7 +545,9 @@ function addManualRow() {
     source: 'manuell',
     originalSource: 'manuell',
     wasEdited: true,
-    physicalProperties: { description: '' }
+    physicalProperties: { description: '' },
+    pubchemDetails: {},
+    smiles: ''
   });
   state.selected = state.components.length - 1;
   recomputeStoichiometry();
@@ -471,7 +586,9 @@ async function processInput() {
       ...comp,
       originalSource: comp.originalSource || comp.source || 'unbekannt',
       wasEdited: false,
-      physicalProperties: comp.physicalProperties || {}
+      physicalProperties: comp.physicalProperties || {},
+      pubchemDetails: comp.pubchemDetails || {},
+      smiles: comp.smiles || (comp.pubchemDetails && comp.pubchemDetails.smiles) || ''
     }));
     recomputeStoichiometry();
     state.logs = data.logs || [];
