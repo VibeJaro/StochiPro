@@ -23,9 +23,9 @@
   </header>
 
   <main class="max-w-6xl mx-auto px-4 py-6 grid gap-6 lg:grid-cols-3">
-    <section class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+    <section class="lg:col-span-3 bg-white rounded-xl shadow-sm border border-slate-200 p-4 space-y-3">
       <div class="flex items-start gap-3">
-        <textarea id="reactionInput" class="w-full border border-slate-200 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:outline-none min-h-[96px]" placeholder="Beschreiben Sie die Reaktion in natürlicher Sprache... (z.B. '4 g Ethanol, 8 g Essigsäure, Produkt: Essigester')"></textarea>
+        <textarea id="reactionInput" class="w-full border border-slate-200 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:outline-none min-h-[120px]" placeholder="Beschreiben Sie die Reaktion in natürlicher Sprache... (z.B. '4 g Ethanol, 8 g Essigsäure, Produkt: Essigester')"></textarea>
         <div class="flex flex-col gap-2">
           <button id="analyzeBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow-sm flex items-center gap-2" onclick="processInput()">
             <i class="fa-solid fa-wand-magic-sparkles"></i>
@@ -35,25 +35,6 @@
         </div>
       </div>
       <p id="statusText" class="text-sm text-slate-500 mt-2 hidden"></p>
-    </section>
-
-    <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 space-y-3">
-      <div class="flex items-center justify-between">
-        <div>
-          <h2 class="font-semibold text-slate-700">LLM & Log</h2>
-          <p class="text-xs text-slate-500">Prompts anpassen, Log ein-/ausklappen.</p>
-        </div>
-        <button id="toggleLog" class="text-sm text-blue-700 hover:text-blue-900" onclick="toggleLog()">
-          <i class="fa-solid fa-angle-down mr-1"></i><span id="toggleLogLabel">Log ausblenden</span>
-        </button>
-      </div>
-      <div class="space-y-2">
-        <label class="text-xs uppercase text-slate-400" for="primaryPrompt">Primärer Extraktions-Prompt</label>
-        <textarea id="primaryPrompt" class="w-full border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"></textarea>
-        <label class="text-xs uppercase text-slate-400" for="retryPrompt">Zweiter Prompt (bei PubChem-Fehlschlag)</label>
-        <textarea id="retryPrompt" class="w-full border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"></textarea>
-      </div>
-      <div id="logList" class="space-y-2 text-sm text-slate-600 max-h-64 overflow-y-auto"></div>
     </section>
 
     <section class="lg:col-span-3 bg-white rounded-xl shadow-sm border border-slate-200 p-4">
@@ -71,6 +52,7 @@
         <table class="w-full text-sm">
           <thead>
             <tr class="text-left text-slate-500">
+              <th class="py-2 w-16 text-center">Auswahl</th>
               <th class="py-2">Rolle</th>
               <th>Name</th>
               <th>Formel</th>
@@ -86,9 +68,57 @@
       </div>
     </section>
 
+      <section class="lg:col-span-3 bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+        <h2 class="font-semibold text-slate-700 mb-3">Detailansicht</h2>
+        <div id="detailPanel" class="text-sm text-slate-700">Keine Auswahl. Wählen Sie eine Stoffzeile aus, um Details zu sehen.</div>
+      </section>
+
     <section class="lg:col-span-3 bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-      <h2 class="font-semibold text-slate-700 mb-3">Detailansicht</h2>
-      <div id="detailPanel" class="text-sm text-slate-700">Keine Auswahl.</div>
+      <details class="group" id="debugPanel">
+        <summary class="flex items-center justify-between cursor-pointer">
+          <div>
+            <h2 class="font-semibold text-slate-700">LLM & Log</h2>
+            <p class="text-xs text-slate-500">Prompts anpassen und Debug-Details nur bei Bedarf anzeigen.</p>
+          </div>
+          <span class="text-xs text-blue-700 group-open:hidden">Ausklappen</span>
+          <span class="text-xs text-blue-700 hidden group-open:inline">Einklappen</span>
+        </summary>
+        <div class="mt-4 space-y-6 border-t border-slate-200 pt-4">
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="space-y-2">
+              <label class="text-xs uppercase text-slate-400" for="primaryPrompt">Primärer Extraktions-Prompt</label>
+              <textarea id="primaryPrompt" class="w-full border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"></textarea>
+            </div>
+            <div class="space-y-2">
+              <label class="text-xs uppercase text-slate-400" for="retryPrompt">Zweiter Prompt (bei PubChem-Fehlschlag)</label>
+              <textarea id="retryPrompt" class="w-full border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"></textarea>
+            </div>
+          </div>
+          <div class="grid md:grid-cols-2 gap-4">
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <h3 class="font-semibold text-slate-700">UI-Log</h3>
+                <span class="text-xs text-slate-500">Reihenfolge der Schritte</span>
+              </div>
+              <div id="logList" class="space-y-2 text-sm text-slate-600 max-h-64 overflow-y-auto"></div>
+            </div>
+            <div class="space-y-3">
+              <div>
+                <h3 class="font-semibold text-slate-700">LLM-Trace</h3>
+                <p class="text-xs text-slate-500">Volle Prompts und Antworten.</p>
+              </div>
+              <div id="llmDebug" class="space-y-2"></div>
+            </div>
+          </div>
+          <div class="space-y-3">
+            <div class="flex items-center justify-between">
+              <h3 class="font-semibold text-slate-700">PubChem-Trace</h3>
+              <span class="text-xs text-slate-500">Anfragen, Antworten, Fehlversuche</span>
+            </div>
+            <div id="pubchemDebug" class="space-y-2"></div>
+          </div>
+        </div>
+      </details>
     </section>
   </main>
 

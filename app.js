@@ -3,7 +3,10 @@ const state = {
   logs: [],
   selected: null,
   summary: '',
-  showLog: true,
+  debug: {
+    llmCalls: [],
+    pubchemCalls: []
+  },
   prompts: {
     primaryPrompt:
       'Extrahiere nur explizit genannte Stoffe als JSON (name, cas, quantity, unit, role, coefficient, aliases). Erlaubte Rollen: Edukt, Produkt, Lösemittel, Additiv, Katalysator. Keine erfundenen Werte.',
@@ -114,13 +117,8 @@ function resetUI() {
   state.logs = [];
   state.selected = null;
   state.summary = '';
+  state.debug = { llmCalls: [], pubchemCalls: [] };
   render();
-}
-
-function toggleLog() {
-  state.showLog = !state.showLog;
-  renderLogs();
-  renderToggle();
 }
 
 function formatNumber(value, digits = 2) {
@@ -130,7 +128,6 @@ function formatNumber(value, digits = 2) {
 
 function renderLogs() {
   const container = document.getElementById('logList');
-  container.classList.toggle('hidden', !state.showLog);
   container.innerHTML = '';
   if (!state.logs.length) {
     container.innerHTML = '<p class="text-slate-400">Noch keine Logs.</p>';
@@ -144,18 +141,117 @@ function renderLogs() {
   });
 }
 
+function renderDebugDetails() {
+  const llmContainer = document.getElementById('llmDebug');
+  const pubchemContainer = document.getElementById('pubchemDebug');
+  if (!llmContainer || !pubchemContainer) return;
+
+  const addCodeBlock = (target, label, text) => {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'mt-2';
+    const lbl = document.createElement('div');
+    lbl.className = 'text-xs uppercase text-slate-400';
+    lbl.textContent = label;
+    const pre = document.createElement('pre');
+    pre.className = 'bg-slate-900 text-white text-xs p-2 rounded-lg overflow-x-auto whitespace-pre-wrap';
+    pre.textContent = text || '–';
+    wrapper.appendChild(lbl);
+    wrapper.appendChild(pre);
+    target.appendChild(wrapper);
+  };
+
+  llmContainer.innerHTML = '';
+  if (!state.debug.llmCalls?.length) {
+    llmContainer.innerHTML = '<p class="text-slate-400 text-sm">Keine LLM-Aufrufe protokolliert.</p>';
+  } else {
+    state.debug.llmCalls.forEach((call, idx) => {
+      const card = document.createElement('div');
+      card.className = 'border border-slate-200 rounded-lg p-3 bg-white';
+      const title = document.createElement('div');
+      title.className = 'font-semibold text-sm text-slate-700';
+      title.textContent = `${idx + 1}. ${call.tag || 'LLM-Aufruf'}`;
+      card.appendChild(title);
+      addCodeBlock(card, 'System-Prompt', call.systemPrompt);
+      addCodeBlock(card, 'User-Message', call.userMessage);
+      if (call.error) {
+        addCodeBlock(card, 'Fehler', call.error);
+      }
+      addCodeBlock(card, 'LLM-Antwort', call.response || '[leer]');
+      llmContainer.appendChild(card);
+    });
+  }
+
+  pubchemContainer.innerHTML = '';
+  if (!state.debug.pubchemCalls?.length) {
+    pubchemContainer.innerHTML = '<p class="text-slate-400 text-sm">Noch keine PubChem-Anfragen protokolliert.</p>';
+  } else {
+    state.debug.pubchemCalls.forEach((entry, idx) => {
+      const card = document.createElement('div');
+      card.className = 'border border-slate-200 rounded-lg p-3 bg-white space-y-2';
+      const title = document.createElement('div');
+      title.className = 'font-semibold text-sm text-slate-700';
+      title.textContent = `${idx + 1}. PubChem: ${entry.query}`;
+      card.appendChild(title);
+
+      const meta = document.createElement('div');
+      meta.className = 'text-xs text-slate-500';
+      meta.textContent = entry.result ? 'Treffer protokolliert' : entry.error ? `Fehler: ${entry.error}` : 'Kein Ergebnis';
+      card.appendChild(meta);
+
+      (entry.steps || []).forEach((step) => {
+        const block = document.createElement('div');
+        block.className = 'bg-slate-50 border border-slate-200 rounded p-2';
+        const heading = document.createElement('div');
+        heading.className = 'text-xs font-semibold text-slate-600';
+        heading.textContent = step.stage;
+        block.appendChild(heading);
+        if (step.url) {
+          const urlEl = document.createElement('div');
+          urlEl.className = 'text-[11px] text-blue-700 break-all';
+          urlEl.textContent = step.url;
+          block.appendChild(urlEl);
+        }
+        if (step.data || step.response || step.body || step.message) {
+          const payload = step.data || step.response || step.body || step.message;
+          const pre = document.createElement('pre');
+          pre.className = 'bg-white border border-slate-200 rounded mt-1 text-[11px] p-2 overflow-x-auto whitespace-pre-wrap';
+          pre.textContent = typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2);
+          block.appendChild(pre);
+        }
+        card.appendChild(block);
+      });
+
+      if (entry.result) {
+        const resultBlock = document.createElement('div');
+        resultBlock.className = 'bg-emerald-50 border border-emerald-200 rounded p-2 text-xs';
+        resultBlock.textContent = `Treffer: CID ${entry.result.cid || entry.cid || 'n/a'} · ${entry.result.name || entry.query}`;
+        card.appendChild(resultBlock);
+      }
+
+      if (entry.error) {
+        const errorBlock = document.createElement('div');
+        errorBlock.className = 'bg-red-50 border border-red-200 rounded p-2 text-xs text-red-700';
+        errorBlock.textContent = `Fehler: ${entry.error}`;
+        card.appendChild(errorBlock);
+      }
+
+      pubchemContainer.appendChild(card);
+    });
+  }
+}
+
 function renderTable() {
   const tbody = document.getElementById('componentTable');
   tbody.innerHTML = '';
   if (!state.components.length) {
-    tbody.innerHTML = '<tr><td colspan="8" class="py-4 text-center text-slate-400">Noch keine Daten.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="py-4 text-center text-slate-400">Noch keine Daten.</td></tr>';
     return;
   }
 
   state.components.forEach((comp, index) => {
     const tr = document.createElement('tr');
-    tr.className = 'hover:bg-blue-50 cursor-pointer';
-    tr.onclick = () => selectComponent(index);
+    const isSelected = state.selected === index;
+    tr.className = `${isSelected ? 'bg-blue-50/60' : ''} hover:bg-blue-50`;
 
     const source = comp.wasEdited && comp.originalSource === 'pubchem' ? 'angepasst' : comp.source;
     const badgeClass =
@@ -168,6 +264,9 @@ function renderTable() {
             : 'bg-slate-100 text-slate-500';
 
     tr.innerHTML = `
+      <td class="text-center align-middle">
+        <input type="radio" name="componentSelect" ${isSelected ? 'checked' : ''} onclick="selectComponent(${index})" aria-label="Komponente auswählen" />
+      </td>
       <td class="py-2 capitalize">
         <select class="w-full bg-transparent focus:outline-none" onchange="handleInlineEdit(event, ${index}, 'role')">
           ${['edukt', 'produkt', 'lösemittel', 'additiv', 'katalysator']
@@ -213,7 +312,7 @@ function renderTable() {
 function renderDetail() {
   const panel = document.getElementById('detailPanel');
   if (state.selected === null) {
-    panel.textContent = 'Keine Auswahl.';
+    panel.textContent = 'Keine Auswahl. Wählen Sie eine Stoffzeile aus, um Details zu sehen.';
     return;
   }
   const comp = state.components[state.selected];
@@ -271,7 +370,7 @@ function renderDetail() {
             <div class="text-xs uppercase text-slate-400 mb-1">Beschreibung</div>
             <div class="text-sm text-slate-700 leading-relaxed">${description}</div>
           </div>`
-        : ''
+        : '<div class="mt-4 text-sm text-slate-500">Keine Beschreibung gefunden.</div>'
     }
     <div class="mt-4">
       <div class="text-xs uppercase text-slate-400 mb-1">Physikalische Eigenschaften</div>
@@ -296,21 +395,12 @@ function render() {
   renderTable();
   renderDetail();
   renderSummary();
-  renderToggle();
+  renderDebugDetails();
 }
 
 function selectComponent(index) {
   state.selected = index;
-  renderDetail();
-}
-
-function renderToggle() {
-  const label = document.getElementById('toggleLogLabel');
-  label.textContent = state.showLog ? 'Log ausblenden' : 'Log anzeigen';
-  const icon = document.querySelector('#toggleLog i');
-  if (icon) {
-    icon.className = state.showLog ? 'fa-solid fa-angle-down mr-1' : 'fa-solid fa-angle-right mr-1';
-  }
+  render();
 }
 
 function handleInlineEdit(event, index, field, type = 'text') {
@@ -386,7 +476,8 @@ async function processInput() {
     recomputeStoichiometry();
     state.logs = data.logs || [];
     state.summary = data.summary || '';
-    state.selected = null;
+    state.debug = data.debug || { llmCalls: [], pubchemCalls: [] };
+    state.selected = state.components.length ? 0 : null;
     render();
     setStatus('Analyse abgeschlossen.');
   } catch (error) {
@@ -401,7 +492,6 @@ async function processInput() {
 
 window.processInput = processInput;
 window.resetUI = resetUI;
-window.toggleLog = toggleLog;
 window.addManualRow = addManualRow;
 window.handleInlineEdit = handleInlineEdit;
 
