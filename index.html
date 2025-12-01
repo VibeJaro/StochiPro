@@ -68,6 +68,31 @@
       </div>
     </section>
 
+    <section class="lg:col-span-3 bg-white rounded-xl shadow-sm border border-slate-200 p-4 space-y-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="font-semibold text-slate-700">KI Analyse</h2>
+          <p class="text-xs text-slate-500">GPT-5.1 kommentiert die Reaktion erst nach Klick – mit Kurzfassung, Sicherheit, Optimierung und Analytik.</p>
+        </div>
+        <button id="analysisBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg shadow-sm flex items-center gap-2" onclick="runReactionAnalysis()">
+          <i class="fa-solid fa-robot"></i>
+          KI-Analyse starten
+        </button>
+      </div>
+      <p id="analysisStatus" class="text-xs text-slate-500 hidden"></p>
+      <div class="grid md:grid-cols-3 gap-4">
+        <div class="md:col-span-2 space-y-2">
+          <div class="text-xs uppercase text-slate-400">Antwort</div>
+          <div id="analysisOutput" class="border border-slate-200 rounded-lg p-3 min-h-[160px] bg-slate-50 text-sm leading-relaxed">Noch keine Analyse gestartet.</div>
+        </div>
+        <div class="space-y-2">
+          <label class="text-xs uppercase text-slate-400" for="analysisPrompt">Prompt für die KI</label>
+          <textarea id="analysisPrompt" class="w-full border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none min-h-[160px]" oninput="handleAnalysisPromptChange(event)"></textarea>
+          <p class="text-[11px] text-slate-500">Der Prompt wird zusammen mit allen in der Detailansicht sichtbaren Stoffdaten an GPT-5.1 gesendet.</p>
+        </div>
+      </div>
+    </section>
+
       <section class="lg:col-span-3 bg-white rounded-xl shadow-sm border border-slate-200 p-4">
         <h2 class="font-semibold text-slate-700 mb-3">Detailansicht</h2>
         <div id="detailPanel" class="text-sm text-slate-700">Keine Auswahl. Wählen Sie eine Stoffzeile aus, um Details zu sehen.</div>
