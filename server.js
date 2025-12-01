@@ -2,6 +2,7 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { analyzeText } from './lib/analyzer.js';
+import { runReactionAnalysis } from './lib/reactionAnalysis.js';
 
 const app = express();
 app.use(express.json());
@@ -18,6 +19,18 @@ app.post('/api/analyze', async (req, res) => {
       return;
     }
     const result = await analyzeText(text, prompts);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message || 'Unknown error' });
+  }
+});
+
+app.post('/api/reaction-analysis', async (req, res) => {
+  try {
+    const components = req.body?.components || [];
+    const prompt = req.body?.prompt;
+    const reactionText = req.body?.reactionText;
+    const result = await runReactionAnalysis(components, prompt, reactionText);
     res.json(result);
   } catch (error) {
     res.status(500).json({ error: error.message || 'Unknown error' });

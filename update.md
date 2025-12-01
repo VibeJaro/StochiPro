@@ -1,6 +1,10 @@
 # Update-Bericht
 
 ## Was wurde geändert?
+- **Neue KI-Analyse-Kachel:** Zwischen Stoffliste und Detailansicht gibt es jetzt eine GPT-5.1-gestützte Einschätzung (Kurzfassung, Sicherheitsrisiken, Optimierung, Analytik). Sie startet nur per Button, zeigt den vollständigen Prompt an und nutzt alle Detaildaten als Kontext.
+- **KI-Analyse nutzt den Originaltext:** Der Reaktionstext (Ziel, Bedingungen, Setup) wird zusammen mit den Detaildaten an das LLM übergeben, damit Sicherheits- und Optimierungshinweise den vollständigen Experimentkontext berücksichtigen.
+- **Lesbare KI-Ausgabe:** Die KI-Antwort wird nur noch einmal angezeigt und mit Markdown gerendert (Überschriften, Listen), damit Sicherheitshinweise und Vorschläge besser erfassbar sind.
+- **Mehrstufige Markdown-Aufzählungen:** Die KI-Ausgabe unterstützt jetzt verschachtelte Listen und größere Überschriften, sodass Struktur und Hierarchie der Hinweise klarer erkennbar sind.
 - **Neue Detailkarten mit allen PubChem-Punkten:** Die Detailansicht zeigt jetzt SMILES, Wikipedia-Link, XLogP3/LogP, pKa, Kovats-Index sowie alle GHS-, Verwendungs- und Umweltangaben in klar getrennten Karten (Struktur, Physik, Verwendung, Sicherheit, Umwelt).
 - **PubChem-Parser erweitert:** Die PUG-View-Auswertung extrahiert jetzt sämtliche in `data_extraction.md` genannten Felder (u. a. Solubility, Vapor Pressure, Piktogramme, P- und H-Sätze, Hazard Classes, Environmental Fate) und übergibt sie an die UI.
 - **Fallback für 3-Ethylphenol:** Ein lokaler Datensatz mit allen extrahierten PubChem-Werten stellt sicher, dass Tests und Demoansichten (Screenshot) ohne Netzwerkkonnektivität funktionieren.
@@ -19,6 +23,7 @@
 - **Tests gepflegt:** Automatische Tests wurden angepasst und durchlaufen, damit die neuen Abläufe stabil bleiben.
 
 ## Warum ist das wichtig?
+- Die KI-Bewertung liefert eine kompakte Sicherheits- und Optimierungs-Sicht auf Basis der Detaildaten, ohne die Ladezeit der Stoffliste zu blockieren.
 - Debugging ist einfacher, weil sämtliche LLM- und PubChem-Aufrufe transparent dokumentiert sind.
 - Nutzerinnen können Zeilen auswählen, ohne versehentlich in die Bearbeitung zu springen.
 - Fehlende Beschreibungen sind sofort erkennbar, vorhandene Beschreibungen werden prominent gezeigt.

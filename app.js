@@ -1,8 +1,24 @@
+const DEFAULT_ANALYSIS_PROMPT = `
+Du bist ein Labor-KI-Assistent, der chemische Reaktionen bewertet.
+Liefere eine kompakte, fachliche Einschätzung mit folgenden Blöcken:
+- Kurzfassung: Reaktion in 1-2 Sätzen zusammenfassen (Edukte ➜ Produkte, Mengen grob einordnen).
+- Sicherheit: Nenne wesentliche Risiken (z. B. GHS-Hinweise, Flammpunkte, Reaktivität) und Sofortmaßnahmen.
+- Optimierung: Mache Vorschläge für schonendere/effizientere Reaktionsführung (Reihenfolge, Temperatur, Alternativen bei Lösemitteln/Katalysatoren).
+- Analytik: Empfiehl geeignete Analytik (z. B. NMR, GC-MS, HPLC, IR, Titration) inkl. sinnvoller Kontrolle der Edukte/Produkte.
+Nutze sowohl den vollständigen Reaktionstext (Ziel, Temperatur, Zeit, Setup, Lösungsmittel, Besonderheiten) als auch die übergebenen Stoffdaten (Name, Rolle, Mengen, physikalische Daten, GHS).
+Antwort klar gegliedert mit Stichpunkten und kurzen Erläuterungen in Deutsch.`;
+
 const state = {
+  reactionText: '',
   components: [],
   logs: [],
   selected: null,
   summary: '',
+  analysis: {
+    prompt: DEFAULT_ANALYSIS_PROMPT,
+    output: '',
+    status: ''
+  },
   debug: {
     llmCalls: [],
     pubchemCalls: []
@@ -109,21 +125,131 @@ function setStatus(text) {
   }
 }
 
+function setAnalysisStatus(text) {
+  state.analysis.status = text;
+  const status = document.getElementById('analysisStatus');
+  if (status) {
+    if (text) {
+      status.textContent = text;
+      status.classList.remove('hidden');
+    } else {
+      status.textContent = '';
+      status.classList.add('hidden');
+    }
+  }
+}
+
 function resetUI() {
   document.getElementById('reactionInput').value = '';
   document.getElementById('primaryPrompt').value = state.prompts.primaryPrompt;
   document.getElementById('retryPrompt').value = state.prompts.retryPrompt;
+  state.reactionText = '';
   state.components = [];
   state.logs = [];
   state.selected = null;
   state.summary = '';
+  state.analysis = { prompt: state.analysis.prompt || DEFAULT_ANALYSIS_PROMPT, output: '', status: '' };
   state.debug = { llmCalls: [], pubchemCalls: [] };
+  document.getElementById('analysisPrompt').value = state.analysis.prompt;
   render();
 }
 
 function formatNumber(value, digits = 2) {
   if (value === null || value === undefined || Number.isNaN(value)) return '–';
   return Number(value).toFixed(digits);
+}
+
+function escapeHtml(text) {
+  return (text || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function renderMarkdown(text) {
+  const safeText = escapeHtml(text || '');
+  const withStrong = safeText.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  const lines = withStrong.split(/\r?\n/);
+  const blocks = [];
+  let listRoots = [];
+  let listStack = [];
+
+  const renderListTree = (items) => {
+    if (!items.length) return '';
+    return `<ul class="list-disc pl-5 space-y-1">${items
+      .map((item) => `<li>${item.content}${renderListTree(item.children)}</li>`)
+      .join('')}</ul>`;
+  };
+
+  const flushList = () => {
+    if (listRoots.length) {
+      blocks.push(renderListTree(listRoots));
+      listRoots = [];
+      listStack = [];
+    }
+  };
+
+  lines.forEach((line) => {
+    if (!line.trim()) {
+      flushList();
+      return;
+    }
+
+    const listMatch = line.match(/^(\s*)([-*])\s+(.+)$/);
+    if (listMatch) {
+      const indent = listMatch[1].length;
+      const level = Math.floor(indent / 2);
+      const content = listMatch[3].trim();
+
+      while (listStack.length > level) {
+        listStack.pop();
+      }
+
+      const node = { content, children: [] };
+
+      if (level === 0 || !listStack.length) {
+        if (level === 0) {
+          listStack = [];
+        }
+        listRoots.push(node);
+        listStack[0] = node;
+      } else {
+        const parent = listStack[level - 1];
+        if (parent) {
+          parent.children.push(node);
+          listStack[level] = node;
+        } else {
+          listRoots.push(node);
+          listStack = [node];
+        }
+      }
+      return;
+    }
+
+    flushList();
+
+    const trimmed = line.trim();
+    const headingMatch = trimmed.match(/^(#{1,3})\s+(.+)$/);
+    if (headingMatch) {
+      const level = Math.min(headingMatch[1].length, 3);
+      const sizeClass = level === 1 ? 'text-2xl' : level === 2 ? 'text-xl' : 'text-lg';
+      const content = headingMatch[2];
+      blocks.push(`<h${level} class="${sizeClass} font-semibold text-slate-800 mb-2">${content}</h${level}>`);
+      return;
+    }
+
+    blocks.push(`<p class="mb-2 leading-relaxed text-slate-700">${trimmed}</p>`);
+  });
+
+  flushList();
+
+  if (!blocks.length) {
+    return '<p class="text-slate-500">Noch keine Analyse gestartet.</p>';
+  }
+
+  return blocks.join('\n');
 }
 
 function renderLogs() {
@@ -503,11 +629,34 @@ function renderSummary() {
   summaryEl.textContent = state.summary || '';
 }
 
+function renderAnalysis() {
+  const output = document.getElementById('analysisOutput');
+  const prompt = document.getElementById('analysisPrompt');
+  const status = document.getElementById('analysisStatus');
+  if (!output || !prompt || !status) return;
+
+  output.innerHTML = state.analysis.output
+    ? renderMarkdown(state.analysis.output)
+    : '<p class="text-slate-500">Noch keine Analyse gestartet.</p>';
+  if (prompt.value !== state.analysis.prompt) {
+    prompt.value = state.analysis.prompt;
+  }
+
+  if (state.analysis.status) {
+    status.textContent = state.analysis.status;
+    status.classList.remove('hidden');
+  } else {
+    status.textContent = '';
+    status.classList.add('hidden');
+  }
+}
+
 function render() {
   renderLogs();
   renderTable();
   renderDetail();
   renderSummary();
+  renderAnalysis();
   renderDebugDetails();
 }
 
@@ -527,6 +676,61 @@ function handleInlineEdit(event, index, field, type = 'text') {
   markEdited(comp);
   recomputeStoichiometry();
   render();
+}
+
+function handleAnalysisPromptChange(event) {
+  state.analysis.prompt = event.target.value;
+}
+
+async function runReactionAnalysis() {
+  if (!state.components.length) {
+    state.analysis.output = '';
+    setAnalysisStatus('Keine Stoffdaten geladen – bitte zuerst die Reaktion analysieren.');
+    renderAnalysis();
+    return;
+  }
+
+  const btn = document.getElementById('analysisBtn');
+  const prompt = document.getElementById('analysisPrompt').value || DEFAULT_ANALYSIS_PROMPT;
+
+  state.analysis.prompt = prompt;
+  setAnalysisStatus('KI-Analyse läuft ...');
+  btn.disabled = true;
+  btn.classList.add('opacity-70');
+
+  try {
+    const response = await fetch('/api/reaction-analysis', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ components: state.components, prompt, reactionText: state.reactionText })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Serverfehler (${response.status})`);
+    }
+
+    const data = await response.json();
+    state.analysis.output = data.analysis || 'Keine Antwort erhalten.';
+    const latestNonAnswerLog = (data.logs || [])
+      .slice()
+      .reverse()
+      .find((log) => !log.startsWith('LLM (Reaktionsanalyse) Antwort'));
+    setAnalysisStatus(latestNonAnswerLog || 'KI-Antwort erhalten.');
+
+    if (Array.isArray(data?.debug?.llmCalls) && data.debug.llmCalls.length) {
+      state.debug.llmCalls.push(...data.debug.llmCalls);
+    }
+    renderDebugDetails();
+  } catch (error) {
+    state.analysis.output = '';
+    setAnalysisStatus(`Fehler: ${error.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('opacity-70');
+    renderAnalysis();
+  }
 }
 
 function addManualRow() {
@@ -561,8 +765,12 @@ async function processInput() {
     return;
   }
 
+  state.reactionText = text;
   state.prompts.primaryPrompt = document.getElementById('primaryPrompt').value || state.prompts.primaryPrompt;
   state.prompts.retryPrompt = document.getElementById('retryPrompt').value || state.prompts.retryPrompt;
+  state.analysis.prompt = document.getElementById('analysisPrompt').value || state.analysis.prompt;
+  state.analysis.output = '';
+  setAnalysisStatus('KI-Analyse wartet auf manuellen Start.');
 
   const btn = document.getElementById('analyzeBtn');
   btn.disabled = true;
@@ -611,8 +819,11 @@ window.processInput = processInput;
 window.resetUI = resetUI;
 window.addManualRow = addManualRow;
 window.handleInlineEdit = handleInlineEdit;
+window.runReactionAnalysis = runReactionAnalysis;
+window.handleAnalysisPromptChange = handleAnalysisPromptChange;
 
 document.getElementById('primaryPrompt').value = state.prompts.primaryPrompt;
 document.getElementById('retryPrompt').value = state.prompts.retryPrompt;
+document.getElementById('analysisPrompt').value = state.analysis.prompt;
 
 render();
