@@ -173,37 +173,74 @@ function renderMarkdown(text) {
   const withStrong = safeText.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
   const lines = withStrong.split(/\r?\n/);
   const blocks = [];
-  let listBuffer = [];
+  let listRoots = [];
+  let listStack = [];
+
+  const renderListTree = (items) => {
+    if (!items.length) return '';
+    return `<ul class="list-disc pl-5 space-y-1">${items
+      .map((item) => `<li>${item.content}${renderListTree(item.children)}</li>`)
+      .join('')}</ul>`;
+  };
 
   const flushList = () => {
-    if (listBuffer.length) {
-      blocks.push(`<ul class="list-disc pl-5 space-y-1">${listBuffer.map((item) => `<li>${item}</li>`).join('')}</ul>`);
-      listBuffer = [];
+    if (listRoots.length) {
+      blocks.push(renderListTree(listRoots));
+      listRoots = [];
+      listStack = [];
     }
   };
 
   lines.forEach((line) => {
-    const trimmed = line.trim();
-    if (!trimmed) {
+    if (!line.trim()) {
       flushList();
       return;
     }
 
-    if (/^[-*]\s+/.test(trimmed)) {
-      listBuffer.push(trimmed.replace(/^[-*]\s+/, ''));
+    const listMatch = line.match(/^(\s*)([-*])\s+(.+)$/);
+    if (listMatch) {
+      const indent = listMatch[1].length;
+      const level = Math.floor(indent / 2);
+      const content = listMatch[3].trim();
+
+      while (listStack.length > level) {
+        listStack.pop();
+      }
+
+      const node = { content, children: [] };
+
+      if (level === 0 || !listStack.length) {
+        if (level === 0) {
+          listStack = [];
+        }
+        listRoots.push(node);
+        listStack[0] = node;
+      } else {
+        const parent = listStack[level - 1];
+        if (parent) {
+          parent.children.push(node);
+          listStack[level] = node;
+        } else {
+          listRoots.push(node);
+          listStack = [node];
+        }
+      }
       return;
     }
 
     flushList();
 
-    if (/^#{1,3}\s+/.test(trimmed)) {
-      const level = Math.min(trimmed.match(/^#+/)[0].length, 3);
-      const content = trimmed.replace(/^#{1,3}\s+/, '');
-      blocks.push(`<h${level} class="font-semibold text-slate-700">${content}</h${level}>`);
+    const trimmed = line.trim();
+    const headingMatch = trimmed.match(/^(#{1,3})\s+(.+)$/);
+    if (headingMatch) {
+      const level = Math.min(headingMatch[1].length, 3);
+      const sizeClass = level === 1 ? 'text-2xl' : level === 2 ? 'text-xl' : 'text-lg';
+      const content = headingMatch[2];
+      blocks.push(`<h${level} class="${sizeClass} font-semibold text-slate-800 mb-2">${content}</h${level}>`);
       return;
     }
 
-    blocks.push(`<p class="mb-2">${trimmed}</p>`);
+    blocks.push(`<p class="mb-2 leading-relaxed text-slate-700">${trimmed}</p>`);
   });
 
   flushList();
