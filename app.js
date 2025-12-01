@@ -159,6 +159,62 @@ function formatNumber(value, digits = 2) {
   return Number(value).toFixed(digits);
 }
 
+function escapeHtml(text) {
+  return (text || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function renderMarkdown(text) {
+  const safeText = escapeHtml(text || '');
+  const withStrong = safeText.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  const lines = withStrong.split(/\r?\n/);
+  const blocks = [];
+  let listBuffer = [];
+
+  const flushList = () => {
+    if (listBuffer.length) {
+      blocks.push(`<ul class="list-disc pl-5 space-y-1">${listBuffer.map((item) => `<li>${item}</li>`).join('')}</ul>`);
+      listBuffer = [];
+    }
+  };
+
+  lines.forEach((line) => {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      flushList();
+      return;
+    }
+
+    if (/^[-*]\s+/.test(trimmed)) {
+      listBuffer.push(trimmed.replace(/^[-*]\s+/, ''));
+      return;
+    }
+
+    flushList();
+
+    if (/^#{1,3}\s+/.test(trimmed)) {
+      const level = Math.min(trimmed.match(/^#+/)[0].length, 3);
+      const content = trimmed.replace(/^#{1,3}\s+/, '');
+      blocks.push(`<h${level} class="font-semibold text-slate-700">${content}</h${level}>`);
+      return;
+    }
+
+    blocks.push(`<p class="mb-2">${trimmed}</p>`);
+  });
+
+  flushList();
+
+  if (!blocks.length) {
+    return '<p class="text-slate-500">Noch keine Analyse gestartet.</p>';
+  }
+
+  return blocks.join('\n');
+}
+
 function renderLogs() {
   const container = document.getElementById('logList');
   container.innerHTML = '';
@@ -542,7 +598,9 @@ function renderAnalysis() {
   const status = document.getElementById('analysisStatus');
   if (!output || !prompt || !status) return;
 
-  output.textContent = state.analysis.output || 'Noch keine Analyse gestartet.';
+  output.innerHTML = state.analysis.output
+    ? renderMarkdown(state.analysis.output)
+    : '<p class="text-slate-500">Noch keine Analyse gestartet.</p>';
   if (prompt.value !== state.analysis.prompt) {
     prompt.value = state.analysis.prompt;
   }
@@ -618,8 +676,11 @@ async function runReactionAnalysis() {
 
     const data = await response.json();
     state.analysis.output = data.analysis || 'Keine Antwort erhalten.';
-    const latestLog = data.logs?.[data.logs.length - 1];
-    setAnalysisStatus(latestLog || 'KI-Antwort erhalten.');
+    const latestNonAnswerLog = (data.logs || [])
+      .slice()
+      .reverse()
+      .find((log) => !log.startsWith('LLM (Reaktionsanalyse) Antwort'));
+    setAnalysisStatus(latestNonAnswerLog || 'KI-Antwort erhalten.');
 
     if (Array.isArray(data?.debug?.llmCalls) && data.debug.llmCalls.length) {
       state.debug.llmCalls.push(...data.debug.llmCalls);
