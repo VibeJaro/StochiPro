@@ -1,6 +1,12 @@
 # Update-Bericht
 
 ## Was wurde geändert?
+- **UI-Reihenfolge neu sortiert:** Eingabefeld ➜ Tabelle ➜ einklappbare Detailansicht ➜ KI-Analyse ➜ gebündelte Prompt-Sektion ➜ Debug/Log.
+- **Detailansicht standardmäßig zu:** Farbig hervorgehobener Toggle mit animiertem Ausklappen, kompakter Vorschau (Name, CAS, Formel, CID, SMILES, Wikipedia) auch im eingeklappten Zustand.
+- **Prompt-Sektion gebündelt:** Alle LLM-Prompts (Extraktion, Retry, KI-Analyse) liegen nun in einem eigenen Block unterhalb der Analyse.
+- **Tabellen-Editing repariert:** Inline-Eingaben verlieren den Cursor nicht mehr; berechnete Werte werden live und ohne Fokusverlust aktualisiert.
+- **PubChem-Shortcut für manuelle Zeilen:** Jede manuell gepflegte Zeile bietet einen PubChem-Button, der mit Name/CAS/Formel/SMILES einen Lookup auslöst und die Daten in Tabelle, Detail und Debug-Trace übernimmt.
+- **Detail-Animation & Stil:** Neue Collapsible-Stile sorgen für weiches Ausklappen und bleiben auch nach Auswahlwechsel stabil.
 - **Neue KI-Analyse-Kachel:** Zwischen Stoffliste und Detailansicht gibt es jetzt eine GPT-5.1-gestützte Einschätzung (Kurzfassung, Sicherheitsrisiken, Optimierung, Analytik). Sie startet nur per Button, zeigt den vollständigen Prompt an und nutzt alle Detaildaten als Kontext.
 - **KI-Analyse nutzt den Originaltext:** Der Reaktionstext (Ziel, Bedingungen, Setup) wird zusammen mit den Detaildaten an das LLM übergeben, damit Sicherheits- und Optimierungshinweise den vollständigen Experimentkontext berücksichtigen.
 - **Lesbare KI-Ausgabe:** Die KI-Antwort wird nur noch einmal angezeigt und mit Markdown gerendert (Überschriften, Listen), damit Sicherheitshinweise und Vorschläge besser erfassbar sind.
