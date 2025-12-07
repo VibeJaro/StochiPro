@@ -14,6 +14,7 @@ const state = {
   logs: [],
   selected: null,
   summary: '',
+  detailCollapsed: true,
   analysis: {
     prompt: DEFAULT_ANALYSIS_PROMPT,
     output: '',
@@ -148,6 +149,7 @@ function resetUI() {
   state.logs = [];
   state.selected = null;
   state.summary = '';
+  state.detailCollapsed = true;
   state.analysis = { prompt: state.analysis.prompt || DEFAULT_ANALYSIS_PROMPT, output: '', status: '' };
   state.debug = { llmCalls: [], pubchemCalls: [] };
   document.getElementById('analysisPrompt').value = state.analysis.prompt;
@@ -157,6 +159,13 @@ function resetUI() {
 function formatNumber(value, digits = 2) {
   if (value === null || value === undefined || Number.isNaN(value)) return '–';
   return Number(value).toFixed(digits);
+}
+
+function deriveSourceBadge(source) {
+  if (source === 'pubchem') return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
+  if (source === 'fallback') return 'bg-amber-50 text-amber-700 border border-amber-200';
+  if (source === 'angepasst') return 'bg-purple-50 text-purple-700 border border-purple-200';
+  return 'bg-slate-100 text-slate-500 border border-slate-200';
 }
 
 function escapeHtml(text) {
@@ -378,16 +387,10 @@ function renderTable() {
     const tr = document.createElement('tr');
     const isSelected = state.selected === index;
     tr.className = `${isSelected ? 'bg-blue-50/60' : ''} hover:bg-blue-50`;
+    tr.dataset.rowIndex = index;
 
     const source = comp.wasEdited && comp.originalSource === 'pubchem' ? 'angepasst' : comp.source;
-    const badgeClass =
-      source === 'pubchem'
-        ? 'bg-emerald-50 text-emerald-700'
-        : source === 'fallback'
-          ? 'bg-amber-50 text-amber-700'
-          : source === 'angepasst'
-            ? 'bg-purple-50 text-purple-700'
-            : 'bg-slate-100 text-slate-500';
+    const badgeClass = deriveSourceBadge(source);
 
     tr.innerHTML = `
       <td class="text-center align-middle">
@@ -405,7 +408,11 @@ function renderTable() {
           <input class="w-full bg-transparent border-b border-transparent focus:border-blue-500 focus:outline-none"
             value="${comp.name || comp.originalName || ''}"
             oninput="handleInlineEdit(event, ${index}, 'name')" />
-          ${comp.wasEdited ? '<span class="text-amber-500 text-xs" title="Manuell angepasst">●</span>' : ''}
+          <button class="text-blue-600 hover:text-blue-800 text-xs" title="PubChem-Abfrage"
+            onclick="triggerPubchemLookup(event, ${index})">
+            <i class="fa-solid fa-magnifying-glass"></i>
+          </button>
+          <span class="text-amber-500 text-xs ${comp.wasEdited ? '' : 'hidden'} edit-dot" title="Manuell angepasst">●</span>
         </div>
       </td>
       <td><input class="w-full bg-transparent border-b border-transparent focus:border-blue-500 focus:outline-none"
@@ -418,10 +425,10 @@ function renderTable() {
             value="${comp.unit || ''}" oninput="handleInlineEdit(event, ${index}, 'unit')" placeholder="Einheit" />
         </div>
       </td>
-      <td class="text-right">${formatNumber(comp.mass)}</td>
-      <td class="text-right">${formatNumber(comp.moles)}</td>
-      <td class="text-right">${comp.equivalents ? formatNumber(comp.equivalents) : '–'}</td>
-      <td class="text-center"><span class="text-xs px-2 py-1 rounded-full ${badgeClass}" title="${
+      <td class="text-right mass-cell">${formatNumber(comp.mass)}</td>
+      <td class="text-right moles-cell">${formatNumber(comp.moles)}</td>
+      <td class="text-right equiv-cell">${comp.equivalents ? formatNumber(comp.equivalents) : '–'}</td>
+      <td class="text-center"><span class="text-xs px-2 py-1 rounded-full source-badge ${badgeClass}" title="${
         comp.wasEdited && comp.originalSource === 'pubchem'
           ? 'Aus PubChem geladen, dann manuell angepasst'
           : comp.source === 'pubchem'
@@ -438,7 +445,7 @@ function renderTable() {
 function renderDetail() {
   const panel = document.getElementById('detailPanel');
   if (state.selected === null) {
-    panel.textContent = 'Keine Auswahl. Wählen Sie eine Stoffzeile aus, um Details zu sehen.';
+    panel.innerHTML = '<div class="text-slate-500">Keine Auswahl. Wählen Sie eine Stoffzeile aus, um Details zu sehen.</div>';
     return;
   }
   const comp = state.components[state.selected];
@@ -501,7 +508,22 @@ function renderDetail() {
     { label: 'Kovats-Retentionsindex', value: detail.kovatsRetentionIndex }
   ];
 
-  panel.innerHTML = `
+  const quickFacts = [
+    { label: 'Name', value: comp.name || comp.originalName || '–' },
+    { label: 'CAS', value: comp.cas || detail.casNumber || '–' },
+    { label: 'Formel', value: comp.formula || '–' },
+    { label: 'PubChem CID', value: comp.cid || '–' },
+    { label: 'SMILES', value: comp.smiles || detail.smiles || '–' },
+    {
+      label: 'Wikipedia',
+      value:
+        detail.wikipedia
+          ? `<a class="text-blue-700 hover:underline" href="${detail.wikipedia}" target="_blank" rel="noreferrer">Link öffnen</a>`
+          : '–'
+    }
+  ];
+
+  const fullDetail = `
     <div class="grid md:grid-cols-3 gap-4">
       <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-2">
         <div class="text-xs uppercase text-slate-400">Name</div>
@@ -622,6 +644,38 @@ function renderDetail() {
       }
     </div>
   `;
+
+  panel.innerHTML = `
+    <div class="flex items-center justify-between gap-3 mb-3">
+      <div>
+        <p class="text-xs uppercase text-slate-400">Auswahl</p>
+        <h3 class="text-lg font-semibold">${comp.name || comp.originalName || 'Unbenannt'}</h3>
+        <p class="text-xs text-slate-500">Kurzinfo immer sichtbar – komplette Karte über den Button.</p>
+      </div>
+      <button class="px-4 py-2 rounded-lg text-white shadow-sm transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
+        state.detailCollapsed ? 'bg-orange-500 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'
+      }" onclick="toggleDetailCollapse()">
+        ${state.detailCollapsed ? '<i class="fa-solid fa-circle-chevron-down mr-2"></i> Details anzeigen' : '<i class="fa-solid fa-circle-chevron-up mr-2"></i> Details verbergen'}
+      </button>
+    </div>
+    <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 mb-3">
+      <div class="text-xs uppercase text-slate-400 mb-2">Kurzinfo</div>
+      <div class="grid md:grid-cols-3 gap-3 text-sm">
+        ${quickFacts
+          .map(
+            (fact) =>
+              `<div class="p-2 rounded border border-slate-200 bg-white flex flex-col gap-1"><span class="text-xs uppercase text-slate-400">${fact.label}</span><span>${fact.value}</span></div>`
+          )
+          .join('')}
+      </div>
+    </div>
+    <div id="detailContent" class="collapsible ${state.detailCollapsed ? 'collapsed' : 'expanded'}">${fullDetail}</div>
+  `;
+}
+
+function toggleDetailCollapse() {
+  state.detailCollapsed = !state.detailCollapsed;
+  renderDetail();
 }
 
 function renderSummary() {
@@ -662,6 +716,7 @@ function render() {
 
 function selectComponent(index) {
   state.selected = index;
+  state.detailCollapsed = true;
   render();
 }
 
@@ -675,7 +730,43 @@ function handleInlineEdit(event, index, field, type = 'text') {
   comp[field] = value;
   markEdited(comp);
   recomputeStoichiometry();
-  render();
+  updateRowDisplays(index);
+}
+
+function updateRowDisplays(index) {
+  const comp = state.components[index];
+  const row = document.querySelector(`[data-row-index="${index}"]`);
+  if (row) {
+    const massCell = row.querySelector('.mass-cell');
+    const moleCell = row.querySelector('.moles-cell');
+    const equivCell = row.querySelector('.equiv-cell');
+    if (massCell) massCell.textContent = formatNumber(comp.mass);
+    if (moleCell) moleCell.textContent = formatNumber(comp.moles);
+    if (equivCell) equivCell.textContent = comp.equivalents ? formatNumber(comp.equivalents) : '–';
+
+    const dot = row.querySelector('.edit-dot');
+    if (dot) {
+      dot.classList.toggle('hidden', !comp.wasEdited);
+      dot.title = comp.wasEdited ? 'Manuell angepasst' : '';
+    }
+
+    const badge = row.querySelector('.source-badge');
+    if (badge) {
+      const source = comp.wasEdited && comp.originalSource === 'pubchem' ? 'angepasst' : comp.source;
+      badge.textContent = source || 'unbekannt';
+      badge.className = `text-xs px-2 py-1 rounded-full source-badge ${deriveSourceBadge(source)}`;
+      badge.title =
+        comp.wasEdited && comp.originalSource === 'pubchem'
+          ? 'Aus PubChem geladen, dann manuell angepasst'
+          : comp.source === 'pubchem'
+            ? 'Automatisch aus PubChem übernommen'
+            : comp.source === 'fallback'
+              ? 'Fallback-Daten'
+              : 'Manuell gepflegt';
+    }
+  }
+  renderSummary();
+  renderDetail();
 }
 
 function handleAnalysisPromptChange(event) {
@@ -733,6 +824,65 @@ async function runReactionAnalysis() {
   }
 }
 
+async function triggerPubchemLookup(event, index) {
+  event?.stopPropagation();
+  const comp = state.components[index];
+  if (!comp) return;
+
+  const btn = event?.currentTarget;
+  if (btn) {
+    btn.disabled = true;
+    btn.classList.add('opacity-60');
+  }
+
+  setStatus(`PubChem-Abfrage für ${comp.name || comp.originalName || 'die Komponente'} läuft...`);
+
+  try {
+    const response = await fetch('/api/pubchem-lookup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ component: comp, reactionText: state.reactionText, prompts: state.prompts })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Serverfehler (${response.status})`);
+    }
+
+    const data = await response.json();
+    if (data.component) {
+      const updated = {
+        ...comp,
+        ...data.component,
+        originalSource: data.component.originalSource || comp.originalSource || comp.source || 'manuell',
+        wasEdited: false
+      };
+      state.components[index] = updated;
+      recomputeStoichiometry();
+      state.logs = [...state.logs, ...(data.logs || [])];
+      if (Array.isArray(data?.debug?.pubchemCalls)) {
+        state.debug.pubchemCalls.push(...data.debug.pubchemCalls);
+      }
+      if (Array.isArray(data?.debug?.llmCalls)) {
+        state.debug.llmCalls.push(...data.debug.llmCalls);
+      }
+      render();
+      setStatus(`PubChem-Update für ${updated.name || 'die Komponente'} abgeschlossen.`);
+    } else if (data.error) {
+      setStatus(`Fehler: ${data.error}`);
+    } else {
+      setStatus('Keine PubChem-Daten gefunden.');
+    }
+  } catch (error) {
+    setStatus(`PubChem-Fehler: ${error.message}`);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.classList.remove('opacity-60');
+    }
+    setTimeout(() => setStatus(''), 2000);
+  }
+}
+
 function addManualRow() {
   state.components.push({
     name: 'Manuelle Komponente',
@@ -754,6 +904,7 @@ function addManualRow() {
     smiles: ''
   });
   state.selected = state.components.length - 1;
+  state.detailCollapsed = true;
   recomputeStoichiometry();
   render();
 }
@@ -821,6 +972,8 @@ window.addManualRow = addManualRow;
 window.handleInlineEdit = handleInlineEdit;
 window.runReactionAnalysis = runReactionAnalysis;
 window.handleAnalysisPromptChange = handleAnalysisPromptChange;
+window.toggleDetailCollapse = toggleDetailCollapse;
+window.triggerPubchemLookup = triggerPubchemLookup;
 
 document.getElementById('primaryPrompt').value = state.prompts.primaryPrompt;
 document.getElementById('retryPrompt').value = state.prompts.retryPrompt;

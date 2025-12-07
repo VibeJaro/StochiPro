@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { analyzeText } from './lib/analyzer.js';
 import { runReactionAnalysis } from './lib/reactionAnalysis.js';
+import { lookupManualComponent } from './lib/manualLookup.js';
 
 const app = express();
 app.use(express.json());
@@ -31,6 +32,22 @@ app.post('/api/reaction-analysis', async (req, res) => {
     const prompt = req.body?.prompt;
     const reactionText = req.body?.reactionText;
     const result = await runReactionAnalysis(components, prompt, reactionText);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message || 'Unknown error' });
+  }
+});
+
+app.post('/api/pubchem-lookup', async (req, res) => {
+  try {
+    const component = req.body?.component;
+    const prompts = req.body?.prompts || {};
+    const reactionText = req.body?.reactionText || '';
+    if (!component) {
+      res.status(400).json({ error: 'Component required' });
+      return;
+    }
+    const result = await lookupManualComponent(component, prompts, reactionText);
     res.json(result);
   } catch (error) {
     res.status(500).json({ error: error.message || 'Unknown error' });
