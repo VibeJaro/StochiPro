@@ -947,6 +947,7 @@ async function triggerPubchemLookup(event, index) {
     if (data.compound) {
       Object.assign(comp, {
         cid: data.compound.cid || comp.cid,
+        cas: data.compound.cas || comp.cas,
         name: data.compound.name || comp.name,
         molecularWeight: data.compound.molecularWeight ?? comp.molecularWeight,
         formula: data.compound.formula || comp.formula,
