@@ -771,6 +771,21 @@ function render() {
   renderDebugDetails();
 }
 
+function updateSelectionHighlight() {
+  const rows = document.getElementById('componentTable')?.querySelectorAll('tr');
+  if (!rows) return;
+
+  rows.forEach((row) => {
+    const rowIndex = Number(row.dataset.index);
+    const isSelected = rowIndex === state.selected;
+    row.classList.toggle('bg-blue-50/60', isSelected);
+    const radio = row.querySelector('input[type="radio"][name="componentSelect"]');
+    if (radio) {
+      radio.checked = isSelected;
+    }
+  });
+}
+
 function getStructureTooltipElement() {
   let tooltip = document.getElementById('structureTooltip');
   if (!tooltip) {
@@ -815,7 +830,8 @@ function hideStructureTooltip() {
 function selectComponent(index) {
   state.selected = index;
   state.detailExpanded = false;
-  render();
+  updateSelectionHighlight();
+  renderDetail();
 }
 
 function handleInlineEdit(event, index, field, type = 'text') {
