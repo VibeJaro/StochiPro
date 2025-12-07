@@ -386,7 +386,7 @@ function renderTable() {
   const tbody = document.getElementById('componentTable');
   tbody.innerHTML = '';
   if (!state.components.length) {
-    tbody.innerHTML = '<tr><td colspan="10" class="py-4 text-center text-slate-400">Noch keine Daten.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" class="py-4 text-center text-slate-400">Noch keine Daten.</td></tr>';
     return;
   }
 
@@ -395,6 +395,8 @@ function renderTable() {
     const isSelected = state.selected === index;
     const { badgeClass, label: sourceLabel } = getSourceBadge(comp);
     const showPubchemButton = comp.source === 'manuell' || comp.source === 'fallback' || !comp.cid;
+    const smiles = comp.smiles || (comp.pubchemDetails && comp.pubchemDetails.smiles);
+    const encodedSmiles = smiles ? encodeURIComponent(smiles) : '';
 
     tr.dataset.index = index;
     tr.className = `${isSelected ? 'bg-blue-50/60' : ''} hover:bg-blue-50`;
@@ -415,9 +417,21 @@ function renderTable() {
           <input class="w-full bg-transparent border-b border-transparent focus:border-blue-500 focus:outline-none"
             value="${comp.name || comp.originalName || ''}"
             oninput="handleInlineEdit(event, ${index}, 'name')" />
+          ${
+            smiles
+              ? `<button type="button" class="text-blue-600 hover:text-blue-800 text-xs" aria-label="Strukturvorschau"
+                  onmouseenter="showStructureTooltip(event, '${encodedSmiles}')"
+                  onmousemove="moveStructureTooltip(event)"
+                  onmouseleave="hideStructureTooltip()"
+                  onfocus="showStructureTooltip(event, '${encodedSmiles}')"
+                  onblur="hideStructureTooltip()">🔬</button>`
+              : '<span class="text-slate-300 text-xs" title="Kein SMILES verfügbar">–</span>'
+          }
           <span data-edited-dot class="text-amber-500 text-xs ${comp.wasEdited ? '' : 'hidden'}" title="Manuell angepasst">●</span>
         </div>
       </td>
+      <td><input class="w-full bg-transparent border-b border-transparent focus:border-blue-500 focus:outline-none"
+        value="${comp.cas || ''}" oninput="handleInlineEdit(event, ${index}, 'cas')" placeholder="CAS" /></td>
       <td><input class="w-full bg-transparent border-b border-transparent focus:border-blue-500 focus:outline-none"
         value="${comp.formula || ''}" oninput="handleInlineEdit(event, ${index}, 'formula')" /></td>
       <td class="text-right">
@@ -757,6 +771,47 @@ function render() {
   renderDebugDetails();
 }
 
+function getStructureTooltipElement() {
+  let tooltip = document.getElementById('structureTooltip');
+  if (!tooltip) {
+    tooltip = document.createElement('div');
+    tooltip.id = 'structureTooltip';
+    tooltip.className = 'hidden';
+    document.body.appendChild(tooltip);
+  }
+  return tooltip;
+}
+
+function showStructureTooltip(event, encodedSmiles) {
+  const smiles = decodeURIComponent(encodedSmiles || '');
+  if (!smiles) return;
+  const tooltip = getStructureTooltipElement();
+  const imageUrl = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/${encodeURIComponent(smiles)}/PNG?image_size=200x200`;
+  tooltip.innerHTML = `
+    <div class="structure-tooltip">
+      <div class="text-[11px] uppercase text-slate-500 mb-1">Struktur (SMILES)</div>
+      <img src="${imageUrl}" alt="Struktur basierend auf SMILES" class="max-w-[220px] max-h-[220px]" />
+      <div class="text-[11px] text-slate-500 mt-1 break-words">${escapeHtml(smiles)}</div>
+    </div>
+  `;
+  tooltip.classList.remove('hidden');
+  moveStructureTooltip(event);
+}
+
+function moveStructureTooltip(event) {
+  const tooltip = document.getElementById('structureTooltip');
+  if (!tooltip || tooltip.classList.contains('hidden')) return;
+  tooltip.style.left = `${event.pageX + 14}px`;
+  tooltip.style.top = `${event.pageY + 14}px`;
+}
+
+function hideStructureTooltip() {
+  const tooltip = document.getElementById('structureTooltip');
+  if (tooltip) {
+    tooltip.classList.add('hidden');
+  }
+}
+
 function selectComponent(index) {
   state.selected = index;
   state.detailExpanded = false;
@@ -866,7 +921,7 @@ async function triggerPubchemLookup(event, index) {
   const comp = state.components[index];
   if (!comp) return;
 
-  const query = comp.cas || comp.name || comp.formula || comp.smiles;
+  const query = (comp.cas || '').trim() || comp.name || comp.formula || comp.smiles;
   if (!query) {
     setStatus('Bitte Name, CAS oder Formel eintragen, um PubChem zu befragen.');
     return;
@@ -929,6 +984,7 @@ function addManualRow() {
   state.components.push({
     name: 'Manuelle Komponente',
     role: 'edukt',
+    cas: '',
     formula: '',
     quantity: null,
     unit: '',
@@ -985,6 +1041,7 @@ async function processInput() {
     const data = await response.json();
     state.components = (data.components || []).map((comp) => ({
       ...comp,
+      cas: comp.cas || '',
       originalSource: comp.originalSource || comp.source || 'unbekannt',
       wasEdited: false,
       physicalProperties: comp.physicalProperties || {},
@@ -1016,6 +1073,9 @@ window.handleInlineEdit = handleInlineEdit;
 window.runReactionAnalysis = runReactionAnalysis;
 window.handleAnalysisPromptChange = handleAnalysisPromptChange;
 window.triggerPubchemLookup = triggerPubchemLookup;
+window.showStructureTooltip = showStructureTooltip;
+window.hideStructureTooltip = hideStructureTooltip;
+window.moveStructureTooltip = moveStructureTooltip;
 
 document.getElementById('primaryPrompt').value = state.prompts.primaryPrompt;
 document.getElementById('retryPrompt').value = state.prompts.retryPrompt;
