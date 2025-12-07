@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { analyzeText } from './lib/analyzer.js';
 import { runReactionAnalysis } from './lib/reactionAnalysis.js';
+import { searchCompound } from './lib/pubchem.js';
 
 const app = express();
 app.use(express.json());
@@ -32,6 +33,27 @@ app.post('/api/reaction-analysis', async (req, res) => {
     const reactionText = req.body?.reactionText;
     const result = await runReactionAnalysis(components, prompt, reactionText);
     res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message || 'Unknown error' });
+  }
+});
+
+app.post('/api/pubchem-lookup', async (req, res) => {
+  try {
+    const query = req.body?.query?.trim();
+    if (!query) {
+      res.status(400).json({ error: 'Query required' });
+      return;
+    }
+
+    const trace = [];
+    const compound = await searchCompound(query, trace);
+    if (!compound) {
+      res.status(404).json({ error: 'Kein PubChem-Treffer gefunden', trace });
+      return;
+    }
+
+    res.json({ compound, trace });
   } catch (error) {
     res.status(500).json({ error: error.message || 'Unknown error' });
   }

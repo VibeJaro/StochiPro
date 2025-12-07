@@ -5,3 +5,19 @@ body {
 .badge {
   @apply inline-flex items-center px-2 py-1 rounded-full text-xs font-medium;
 }
+
+.collapsible-panel {
+  overflow: hidden;
+  transition: max-height 0.45s ease, opacity 0.35s ease;
+  max-height: 0;
+  opacity: 0;
+}
+
+.collapsible-panel.open {
+  opacity: 1;
+}
+
+.collapsible-inner {
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+}

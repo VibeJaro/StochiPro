@@ -13,6 +13,7 @@ const state = {
   components: [],
   logs: [],
   selected: null,
+  detailExpanded: false,
   summary: '',
   analysis: {
     prompt: DEFAULT_ANALYSIS_PROMPT,
@@ -48,6 +49,20 @@ function markEdited(component) {
   } else {
     component.source = component.source || 'manuell';
   }
+}
+
+function getSourceBadge(component) {
+  const source = component.wasEdited && component.originalSource === 'pubchem' ? 'angepasst' : component.source;
+  const badgeClass =
+    source === 'pubchem'
+      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+      : source === 'angepasst'
+        ? 'bg-amber-50 text-amber-700 border border-amber-200'
+        : source === 'fallback'
+          ? 'bg-purple-50 text-purple-700 border border-purple-200'
+          : 'bg-slate-100 text-slate-600 border border-slate-200';
+
+  return { label: source || 'unbekannt', badgeClass };
 }
 
 function calculateMassAndMoles(component) {
@@ -147,6 +162,7 @@ function resetUI() {
   state.components = [];
   state.logs = [];
   state.selected = null;
+  state.detailExpanded = false;
   state.summary = '';
   state.analysis = { prompt: state.analysis.prompt || DEFAULT_ANALYSIS_PROMPT, output: '', status: '' };
   state.debug = { llmCalls: [], pubchemCalls: [] };
@@ -370,24 +386,18 @@ function renderTable() {
   const tbody = document.getElementById('componentTable');
   tbody.innerHTML = '';
   if (!state.components.length) {
-    tbody.innerHTML = '<tr><td colspan="9" class="py-4 text-center text-slate-400">Noch keine Daten.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="py-4 text-center text-slate-400">Noch keine Daten.</td></tr>';
     return;
   }
 
   state.components.forEach((comp, index) => {
     const tr = document.createElement('tr');
     const isSelected = state.selected === index;
-    tr.className = `${isSelected ? 'bg-blue-50/60' : ''} hover:bg-blue-50`;
+    const { badgeClass, label: sourceLabel } = getSourceBadge(comp);
+    const showPubchemButton = comp.source === 'manuell' || comp.source === 'fallback' || !comp.cid;
 
-    const source = comp.wasEdited && comp.originalSource === 'pubchem' ? 'angepasst' : comp.source;
-    const badgeClass =
-      source === 'pubchem'
-        ? 'bg-emerald-50 text-emerald-700'
-        : source === 'fallback'
-          ? 'bg-amber-50 text-amber-700'
-          : source === 'angepasst'
-            ? 'bg-purple-50 text-purple-700'
-            : 'bg-slate-100 text-slate-500';
+    tr.dataset.index = index;
+    tr.className = `${isSelected ? 'bg-blue-50/60' : ''} hover:bg-blue-50`;
 
     tr.innerHTML = `
       <td class="text-center align-middle">
@@ -405,7 +415,7 @@ function renderTable() {
           <input class="w-full bg-transparent border-b border-transparent focus:border-blue-500 focus:outline-none"
             value="${comp.name || comp.originalName || ''}"
             oninput="handleInlineEdit(event, ${index}, 'name')" />
-          ${comp.wasEdited ? '<span class="text-amber-500 text-xs" title="Manuell angepasst">●</span>' : ''}
+          <span data-edited-dot class="text-amber-500 text-xs ${comp.wasEdited ? '' : 'hidden'}" title="Manuell angepasst">●</span>
         </div>
       </td>
       <td><input class="w-full bg-transparent border-b border-transparent focus:border-blue-500 focus:outline-none"
@@ -418,18 +428,29 @@ function renderTable() {
             value="${comp.unit || ''}" oninput="handleInlineEdit(event, ${index}, 'unit')" placeholder="Einheit" />
         </div>
       </td>
-      <td class="text-right">${formatNumber(comp.mass)}</td>
-      <td class="text-right">${formatNumber(comp.moles)}</td>
-      <td class="text-right">${comp.equivalents ? formatNumber(comp.equivalents) : '–'}</td>
-      <td class="text-center"><span class="text-xs px-2 py-1 rounded-full ${badgeClass}" title="${
-        comp.wasEdited && comp.originalSource === 'pubchem'
-          ? 'Aus PubChem geladen, dann manuell angepasst'
-          : comp.source === 'pubchem'
-            ? 'Automatisch aus PubChem übernommen'
-            : comp.source === 'fallback'
-              ? 'Fallback-Daten'
-              : 'Manuell gepflegt'
-      }">${source || 'unbekannt'}</span></td>
+      <td class="text-right" data-field="mass">${formatNumber(comp.mass)}</td>
+      <td class="text-right" data-field="moles">${formatNumber(comp.moles)}</td>
+      <td class="text-right" data-field="equivalents">${comp.equivalents ? formatNumber(comp.equivalents) : '–'}</td>
+      <td class="text-center">
+        <div class="flex items-center justify-center gap-2">
+          <span data-source-badge class="text-xs px-2 py-1 rounded-full border ${badgeClass}" title="${
+            comp.wasEdited && comp.originalSource === 'pubchem'
+              ? 'Aus PubChem geladen, dann manuell angepasst'
+              : comp.source === 'pubchem'
+                ? 'Automatisch aus PubChem übernommen'
+                : comp.source === 'fallback'
+                  ? 'Fallback-Daten'
+                  : 'Manuell gepflegt'
+          }">${sourceLabel}</span>
+        </div>
+      </td>
+      <td class="text-center">
+        <button class="text-xs px-2 py-1 rounded border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 disabled:opacity-60"
+          ${showPubchemButton ? '' : 'disabled'}
+          onclick="triggerPubchemLookup(event, ${index})">
+          PubChem
+        </button>
+      </td>
     `;
     tbody.appendChild(tr);
   });
@@ -437,11 +458,25 @@ function renderTable() {
 
 function renderDetail() {
   const panel = document.getElementById('detailPanel');
-  if (state.selected === null) {
-    panel.textContent = 'Keine Auswahl. Wählen Sie eine Stoffzeile aus, um Details zu sehen.';
+  if (!panel) return;
+  const comp = state.selected === null ? null : state.components[state.selected];
+
+  if (!comp) {
+    panel.innerHTML = `
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="font-semibold text-slate-700">Detailansicht</h2>
+          <p class="text-xs text-slate-500">Wählen Sie eine Stoffzeile aus, um Details zu sehen.</p>
+        </div>
+        <button class="px-3 py-2 rounded-lg bg-slate-200 text-slate-500 cursor-not-allowed" disabled>
+          Keine Auswahl
+        </button>
+      </div>
+      <div class="mt-3 text-sm text-slate-500">Noch keine Auswahl getroffen.</div>
+    `;
     return;
   }
-  const comp = state.components[state.selected];
+
   const physical = comp.physicalProperties || {};
   const detail = comp.pubchemDetails || {};
   const densityValue = physical.density || (comp.density ? `${formatNumber(comp.density)} g/mL` : null);
@@ -501,7 +536,21 @@ function renderDetail() {
     { label: 'Kovats-Retentionsindex', value: detail.kovatsRetentionIndex }
   ];
 
-  panel.innerHTML = `
+  const previewItems = [
+    { label: 'CAS', value: comp.cas || detail.cas || '–' },
+    { label: 'Formel', value: comp.formula || '–' },
+    { label: 'CID', value: comp.cid || detail.cid || '–' },
+    { label: 'SMILES', value: comp.smiles || detail.smiles || '–' },
+    {
+      label: 'Wikipedia',
+      value:
+        detail.wikipedia
+          ? `<a class="text-blue-700 hover:underline" href="${detail.wikipedia}" target="_blank" rel="noreferrer">Wikipedia öffnen</a>`
+          : '–'
+    }
+  ];
+
+  const detailContent = `
     <div class="grid md:grid-cols-3 gap-4">
       <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-2">
         <div class="text-xs uppercase text-slate-400">Name</div>
@@ -622,6 +671,54 @@ function renderDetail() {
       }
     </div>
   `;
+
+  panel.innerHTML = `
+    <div class="flex items-center justify-between">
+      <div>
+        <h2 class="font-semibold text-slate-700">Detailansicht</h2>
+        <p class="text-xs text-slate-500">Stoffdaten kompakt ein- oder ausklappbar.</p>
+      </div>
+      <button data-detail-toggle class="px-4 py-2 rounded-lg shadow-sm text-white transition-transform ${
+        state.detailExpanded ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-500 hover:bg-amber-600'
+      }">
+        ${state.detailExpanded ? 'Einklappen' : 'Details anzeigen'}
+      </button>
+    </div>
+    <div class="mt-3 space-y-3">
+      <div class="bg-gradient-to-r from-blue-50 to-slate-50 border border-blue-100 rounded-lg p-3">
+        <div class="font-semibold text-lg text-slate-800">${comp.name}</div>
+        <div class="grid sm:grid-cols-3 gap-2 mt-2 text-sm text-slate-600">
+          ${previewItems
+            .map(
+              (item) =>
+                `<div class="flex items-center gap-2"><span class="text-[11px] uppercase text-slate-400">${item.label}</span><span class="truncate">${item.value}</span></div>`
+            )
+            .join('')}
+        </div>
+      </div>
+      <div data-collapsible class="collapsible-panel ${state.detailExpanded ? 'open' : 'closed'}">
+        <div class="collapsible-inner">${detailContent}</div>
+      </div>
+    </div>
+  `;
+
+  const toggleBtn = panel.querySelector('[data-detail-toggle]');
+  const collapsible = panel.querySelector('[data-collapsible]');
+  if (toggleBtn) {
+    toggleBtn.onclick = () => {
+      state.detailExpanded = !state.detailExpanded;
+      renderDetail();
+    };
+  }
+
+  if (collapsible) {
+    const inner = collapsible.querySelector('.collapsible-inner');
+    if (state.detailExpanded) {
+      collapsible.style.maxHeight = `${inner.scrollHeight + 48}px`;
+    } else {
+      collapsible.style.maxHeight = '0px';
+    }
+  }
 }
 
 function renderSummary() {
@@ -662,6 +759,7 @@ function render() {
 
 function selectComponent(index) {
   state.selected = index;
+  state.detailExpanded = false;
   render();
 }
 
@@ -675,7 +773,37 @@ function handleInlineEdit(event, index, field, type = 'text') {
   comp[field] = value;
   markEdited(comp);
   recomputeStoichiometry();
-  render();
+
+  const tbody = document.getElementById('componentTable');
+  if (tbody) {
+    Array.from(tbody.querySelectorAll('tr')).forEach((rowEl) => {
+      const rowIndex = Number(rowEl.dataset.index);
+      const rowComp = state.components[rowIndex];
+      if (!rowComp) return;
+
+      const massCell = rowEl.querySelector('[data-field="mass"]');
+      const molesCell = rowEl.querySelector('[data-field="moles"]');
+      const eqCell = rowEl.querySelector('[data-field="equivalents"]');
+      const sourceBadge = rowEl.querySelector('[data-source-badge]');
+      const editedDot = rowEl.querySelector('[data-edited-dot]');
+
+      if (editedDot && rowComp.wasEdited) {
+        editedDot.classList.remove('hidden');
+      }
+
+      if (massCell) massCell.textContent = formatNumber(rowComp.mass);
+      if (molesCell) molesCell.textContent = formatNumber(rowComp.moles);
+      if (eqCell) eqCell.textContent = rowComp.equivalents ? formatNumber(rowComp.equivalents) : '–';
+      if (sourceBadge) {
+        const { badgeClass, label } = getSourceBadge(rowComp);
+        sourceBadge.textContent = label;
+        sourceBadge.className = `text-xs px-2 py-1 rounded-full border ${badgeClass}`;
+      }
+    });
+  }
+
+  renderDetail();
+  renderSummary();
 }
 
 function handleAnalysisPromptChange(event) {
@@ -733,6 +861,70 @@ async function runReactionAnalysis() {
   }
 }
 
+async function triggerPubchemLookup(event, index) {
+  event.stopPropagation();
+  const comp = state.components[index];
+  if (!comp) return;
+
+  const query = comp.cas || comp.name || comp.formula || comp.smiles;
+  if (!query) {
+    setStatus('Bitte Name, CAS oder Formel eintragen, um PubChem zu befragen.');
+    return;
+  }
+
+  const btn = event.currentTarget;
+  btn.disabled = true;
+  btn.classList.add('opacity-70');
+  setStatus('PubChem-Abfrage läuft ...');
+
+  try {
+    const response = await fetch('/api/pubchem-lookup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Serverfehler (${response.status})`);
+    }
+
+    const data = await response.json();
+    if (data.compound) {
+      Object.assign(comp, {
+        cid: data.compound.cid || comp.cid,
+        name: data.compound.name || comp.name,
+        molecularWeight: data.compound.molecularWeight ?? comp.molecularWeight,
+        formula: data.compound.formula || comp.formula,
+        density: data.compound.density ?? comp.density,
+        description: data.compound.description || comp.description,
+        physicalProperties: data.compound.physicalProperties || comp.physicalProperties || {},
+        pubchemDetails: data.compound.pubchemDetails || comp.pubchemDetails || {},
+        smiles: data.compound.smiles || comp.smiles,
+        source: 'pubchem',
+        originalSource: 'pubchem',
+        wasEdited: false
+      });
+      recomputeStoichiometry();
+      render();
+    }
+
+    if (Array.isArray(data.trace) && data.trace.length) {
+      state.debug.pubchemCalls.push(...data.trace);
+      renderDebugDetails();
+    }
+
+    state.logs.push(`Manuelle PubChem-Abfrage für "${query}" abgeschlossen.`);
+    renderLogs();
+    setStatus('PubChem-Daten aktualisiert.');
+  } catch (error) {
+    setStatus(`PubChem-Fehler: ${error.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('opacity-70');
+    setTimeout(() => setStatus(''), 2000);
+  }
+}
+
 function addManualRow() {
   state.components.push({
     name: 'Manuelle Komponente',
@@ -754,6 +946,7 @@ function addManualRow() {
     smiles: ''
   });
   state.selected = state.components.length - 1;
+  state.detailExpanded = false;
   recomputeStoichiometry();
   render();
 }
@@ -802,6 +995,7 @@ async function processInput() {
     state.logs = data.logs || [];
     state.summary = data.summary || '';
     state.debug = data.debug || { llmCalls: [], pubchemCalls: [] };
+    state.detailExpanded = false;
     state.selected = state.components.length ? 0 : null;
     render();
     setStatus('Analyse abgeschlossen.');
@@ -821,6 +1015,7 @@ window.addManualRow = addManualRow;
 window.handleInlineEdit = handleInlineEdit;
 window.runReactionAnalysis = runReactionAnalysis;
 window.handleAnalysisPromptChange = handleAnalysisPromptChange;
+window.triggerPubchemLookup = triggerPubchemLookup;
 
 document.getElementById('primaryPrompt').value = state.prompts.primaryPrompt;
 document.getElementById('retryPrompt').value = state.prompts.retryPrompt;
