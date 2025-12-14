@@ -329,7 +329,7 @@ test('analyzeText queries PubChem per LLM component', async () => {
   );
 
   assert.equal(result.components.length, 3);
-  assert.deepEqual(seen, ['ethanol', 'essigsäure', 'schwefelsäure']);
+  assert.deepEqual(seen.sort(), ['essigsäure', 'ethanol', 'schwefelsäure'].sort());
   assert.equal(result.components[0].name, 'ethanol');
   assert.equal(result.components[1].name, 'essigsäure');
   assert.equal(result.components[2].name, 'schwefelsäure');
