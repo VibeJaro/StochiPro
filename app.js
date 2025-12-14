@@ -15,6 +15,8 @@ const state = {
   selected: null,
   detailExpanded: false,
   summary: '',
+  debugLoaded: false,
+  debugLoading: false,
   analysis: {
     prompt: DEFAULT_ANALYSIS_PROMPT,
     output: '',
@@ -164,6 +166,8 @@ function resetUI() {
   state.selected = null;
   state.detailExpanded = false;
   state.summary = '';
+  state.debugLoaded = false;
+  state.debugLoading = false;
   state.analysis = { prompt: state.analysis.prompt || DEFAULT_ANALYSIS_PROMPT, output: '', status: '' };
   state.debug = { llmCalls: [], pubchemCalls: [] };
   document.getElementById('analysisPrompt').value = state.analysis.prompt;
@@ -281,6 +285,33 @@ function renderLogs() {
     entry.textContent = line;
     container.appendChild(entry);
   });
+}
+
+function renderDebugPlaceholder() {
+  if (state.debugLoaded) return;
+  const icon = state.debugLoading
+    ? '<i class="fa-solid fa-circle-notch fa-spin text-blue-600"></i>'
+    : '<i class="fa-solid fa-triangle-exclamation text-amber-500"></i>';
+  const text = state.debugLoading
+    ? 'Logs werden vorbereitet ...'
+    : 'Debug-Bereich noch nicht geladen. Bitte ausklappen.';
+  const html = `<div class="flex items-center gap-2 text-sm text-slate-500">${icon}<span>${text}</span></div>`;
+
+  ['logList', 'llmDebug', 'pubchemDebug'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.innerHTML = html;
+    }
+  });
+}
+
+function updateDebugSections(forceRender = false) {
+  if (!forceRender && !state.debugLoaded) {
+    renderDebugPlaceholder();
+    return;
+  }
+  renderLogs();
+  renderDebugDetails();
 }
 
 function renderDebugDetails() {
@@ -763,12 +794,26 @@ function renderAnalysis() {
 }
 
 function render() {
-  renderLogs();
+  updateDebugSections();
   renderTable();
   renderDetail();
   renderSummary();
   renderAnalysis();
-  renderDebugDetails();
+}
+
+function handleDebugPanelToggle(event) {
+  const panel = event.currentTarget;
+  if (panel.open && !state.debugLoaded) {
+    state.debugLoading = true;
+    renderDebugPlaceholder();
+    setTimeout(() => {
+      state.debugLoaded = true;
+      state.debugLoading = false;
+      updateDebugSections(true);
+    }, 120);
+  } else if (panel.open && state.debugLoaded) {
+    updateDebugSections(true);
+  }
 }
 
 function updateSelectionHighlight() {
@@ -921,7 +966,7 @@ async function runReactionAnalysis() {
     if (Array.isArray(data?.debug?.llmCalls) && data.debug.llmCalls.length) {
       state.debug.llmCalls.push(...data.debug.llmCalls);
     }
-    renderDebugDetails();
+    updateDebugSections();
   } catch (error) {
     state.analysis.output = '';
     setAnalysisStatus(`Fehler: ${error.message}`);
@@ -982,11 +1027,11 @@ async function triggerPubchemLookup(event, index) {
 
     if (Array.isArray(data.trace) && data.trace.length) {
       state.debug.pubchemCalls.push(...data.trace);
-      renderDebugDetails();
+      updateDebugSections();
     }
 
     state.logs.push(`Manuelle PubChem-Abfrage für "${query}" abgeschlossen.`);
-    renderLogs();
+    updateDebugSections();
     setStatus('PubChem-Daten aktualisiert.');
   } catch (error) {
     setStatus(`PubChem-Fehler: ${error.message}`);
@@ -1097,5 +1142,10 @@ window.moveStructureTooltip = moveStructureTooltip;
 document.getElementById('primaryPrompt').value = state.prompts.primaryPrompt;
 document.getElementById('retryPrompt').value = state.prompts.retryPrompt;
 document.getElementById('analysisPrompt').value = state.analysis.prompt;
+
+const debugPanel = document.getElementById('debugPanel');
+if (debugPanel) {
+  debugPanel.addEventListener('toggle', handleDebugPanelToggle);
+}
 
 render();
