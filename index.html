@@ -8,151 +8,222 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <link rel="stylesheet" href="styles.css" />
 </head>
-<body class="bg-slate-50 text-slate-800 min-h-screen">
-  <header class="bg-slate-900 text-white shadow-md">
-    <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <i class="fa-solid fa-atom text-blue-400 text-xl"></i>
-        <div>
-          <div class="text-lg font-semibold">StochiPro</div>
-          <div class="text-xs text-slate-200">AI-gestützte Stöchiometrie</div>
-        </div>
+<body class="bg-slate-50 text-slate-900 min-h-screen relative overflow-x-hidden">
+  <div class="absolute top-[-20%] left-[-10%] w-[420px] h-[420px] bg-blue-200 blur-3xl opacity-40 rounded-full"></div>
+  <div class="absolute bottom-[-25%] right-[-5%] w-[520px] h-[520px] bg-cyan-200 blur-3xl opacity-40 rounded-full"></div>
+
+  <div id="loadingOverlay" class="hidden fixed inset-0 bg-slate-900/80 backdrop-blur-md z-50 flex flex-col items-center justify-center text-white">
+    <div class="w-20 h-20 rounded-full border-4 border-slate-700 border-t-blue-400 animate-spin mb-6"></div>
+    <h2 class="text-xl font-semibold mb-2">Wir bereiten deine Reaktion auf...</h2>
+    <div class="text-sm text-slate-200 space-y-1 font-mono text-center">
+      <div class="animate-pulse">Extrahiere Reagenzien aus Text</div>
+      <div class="animate-pulse">PubChem-Abfragen vorbereiten</div>
+      <div class="animate-pulse">Stöchiometrie neu berechnen</div>
+    </div>
+  </div>
+
+  <header class="max-w-6xl mx-auto px-4 py-6 flex items-center justify-between relative z-10">
+    <div class="flex items-center gap-3">
+      <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-700 to-cyan-500 text-white flex items-center justify-center text-xl font-bold shadow-lg">SP</div>
+      <div>
+        <div class="text-lg font-semibold">StochiPro</div>
+        <div class="text-xs text-slate-500">AI-gestützte Stöchiometrie</div>
       </div>
-      <span class="text-sm text-slate-200 flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-emerald-400"></span> Ready</span>
+    </div>
+    <div class="flex items-center gap-2 text-sm text-slate-600 bg-white/70 backdrop-blur px-3 py-2 rounded-full border border-white shadow-sm">
+      <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+      Bereit für deine Synthese
     </div>
   </header>
 
-  <main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
-    <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 space-y-3">
-      <div class="flex items-start gap-3">
-        <textarea id="reactionInput" class="w-full border border-slate-200 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:outline-none min-h-[120px]" placeholder="Beschreiben Sie die Reaktion in natürlicher Sprache... (z.B. '4 g Ethanol, 8 g Essigsäure, Produkt: Essigester')"></textarea>
-        <div class="flex flex-col gap-2">
-          <button id="analyzeBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow-sm flex items-center gap-2" onclick="processInput()">
-            <i class="fa-solid fa-wand-magic-sparkles"></i>
-            Analysieren
-          </button>
-          <button class="text-slate-500 hover:text-red-600 text-sm" onclick="resetUI()">Zurücksetzen</button>
-        </div>
-      </div>
-      <p id="statusText" class="text-sm text-slate-500 mt-2 hidden"></p>
-    </section>
-
-    <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-      <div class="flex items-center justify-between mb-3">
-        <div class="flex items-center gap-3">
-          <h2 class="font-semibold text-slate-700">Stoffliste</h2>
-          <button onclick="addManualRow()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-1 rounded">
-            Manuelle Zeile
-          </button>
-          <span class="text-xs text-slate-500">Manuelle Änderungen sind mit einem Punkt gekennzeichnet.</span>
-        </div>
-        <span id="summary" class="text-sm text-blue-700"></span>
-      </div>
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="text-left text-slate-500">
-              <th class="py-2 w-16 text-center">Auswahl</th>
-              <th class="py-2">Rolle</th>
-              <th>Name</th>
-              <th>CAS</th>
-              <th>Formel</th>
-              <th class="text-right">Menge</th>
-              <th class="text-right">Masse (g)</th>
-              <th class="text-right">Stoffmenge (mmol)</th>
-              <th class="text-right">Äquiv.</th>
-              <th class="text-center">Quelle</th>
-              <th class="text-center w-28">Aktion</th>
-            </tr>
-          </thead>
-          <tbody id="componentTable" class="divide-y divide-slate-100"></tbody>
-        </table>
-      </div>
-    </section>
-
-    <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-      <div id="detailPanel" class="text-sm text-slate-700">Keine Auswahl. Wählen Sie eine Stoffzeile aus, um Details zu sehen.</div>
-    </section>
-
-    <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 space-y-4">
-      <div class="flex items-center justify-between">
-        <div>
-          <h2 class="font-semibold text-slate-700">KI Analyse</h2>
-          <p class="text-xs text-slate-500">GPT-5.1 kommentiert die Reaktion erst nach Klick – mit Kurzfassung, Sicherheit, Optimierung und Analytik.</p>
-        </div>
-        <button id="analysisBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg shadow-sm flex items-center gap-2" onclick="runReactionAnalysis()">
-          <i class="fa-solid fa-robot"></i>
-          KI-Analyse starten
-        </button>
-      </div>
-      <p id="analysisStatus" class="text-xs text-slate-500 hidden"></p>
-      <div class="space-y-2">
-        <div class="text-xs uppercase text-slate-400">Antwort</div>
-        <div id="analysisOutput" class="border border-slate-200 rounded-lg p-3 min-h-[160px] bg-slate-50 text-sm leading-relaxed">Noch keine Analyse gestartet.</div>
-      </div>
-    </section>
-
-    <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 space-y-4">
-      <div class="flex items-center justify-between">
-        <div>
-          <h2 class="font-semibold text-slate-700">Prompts im Einsatz</h2>
-          <p class="text-xs text-slate-500">Alle Eingabeprompts gesammelt – inklusive KI-Analyse.</p>
-        </div>
-        <span class="text-[11px] uppercase text-slate-400">LLM-Steuerung</span>
-      </div>
-      <div class="grid md:grid-cols-3 gap-4">
-        <div class="space-y-2 md:col-span-1">
-          <label class="text-xs uppercase text-slate-400" for="primaryPrompt">Primärer Extraktions-Prompt</label>
-          <textarea id="primaryPrompt" class="w-full border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none min-h-[120px]"></textarea>
-        </div>
-        <div class="space-y-2 md:col-span-1">
-          <label class="text-xs uppercase text-slate-400" for="retryPrompt">Zweiter Prompt (bei PubChem-Fehlschlag)</label>
-          <textarea id="retryPrompt" class="w-full border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none min-h-[120px]"></textarea>
-        </div>
-        <div class="space-y-2 md:col-span-1">
-          <label class="text-xs uppercase text-slate-400" for="analysisPrompt">Prompt für die KI-Analyse</label>
-          <textarea id="analysisPrompt" class="w-full border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none min-h-[120px]" oninput="handleAnalysisPromptChange(event)"></textarea>
-          <p class="text-[11px] text-slate-500">Wird zusammen mit der Detailansicht an GPT-5.1 gesendet.</p>
-        </div>
-      </div>
-    </section>
-
-    <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-      <details class="group" id="debugPanel">
-        <summary class="flex items-center justify-between cursor-pointer">
-          <div>
-            <h2 class="font-semibold text-slate-700">LLM & Log</h2>
-            <p class="text-xs text-slate-500">Debug-Traces, PubChem-Anfragen und UI-Log. Logs laden – kann Minuten dauern.</p>
+  <main class="max-w-6xl mx-auto px-4 pb-12 space-y-8 relative z-10">
+    <section class="bg-white/70 backdrop-blur rounded-3xl shadow-xl border border-slate-100 p-6 md:p-8">
+      <div class="grid md:grid-cols-2 gap-8 items-center">
+        <div class="space-y-4">
+          <p class="text-xs font-semibold tracking-[0.2em] text-blue-700 uppercase">AI Workflow</p>
+          <h1 class="text-4xl md:text-5xl font-bold leading-tight text-slate-900">
+            Von Experiment-Idee zur sauberen Stöchiometrie.
+          </h1>
+          <p class="text-slate-600 text-lg">Beschreibe dein Experiment in natürlicher Sprache. Wir extrahieren automatisch Reagenzien, Mengen und Sicherheitsinfos.</p>
+          <div class="flex flex-wrap gap-2 text-sm text-slate-600">
+            <span class="px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-100 flex items-center gap-2"><i class="fa-solid fa-check"></i> PubChem Lookup</span>
+            <span class="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center gap-2"><i class="fa-solid fa-check"></i> Auto-Stöchiometrie</span>
+            <span class="px-3 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-100 flex items-center gap-2"><i class="fa-solid fa-check"></i> Safety First</span>
           </div>
-          <span class="text-xs text-amber-600 group-open:hidden">⚠️ Logs laden – kann Minuten dauern</span>
-          <span class="text-xs text-blue-700 hidden group-open:inline">Einklappen</span>
-        </summary>
-        <div class="mt-4 space-y-6 border-t border-slate-200 pt-4">
-          <div class="grid md:grid-cols-2 gap-4">
+        </div>
+        <div class="bg-white border border-slate-100 rounded-2xl shadow-lg p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs uppercase tracking-wide text-slate-400">Experimentbeschreibung</span>
+            <span class="text-[11px] text-slate-400 flex items-center gap-1"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Assisted</span>
+          </div>
+          <textarea id="reactionInput" class="w-full border border-slate-200 rounded-xl p-4 focus:ring-2 focus:ring-blue-500 focus:outline-none min-h-[140px] bg-slate-50" placeholder="Beschreibe die Reaktion (z.B. 4 g Ethanol, 8 g Essigsäure, Produkt: Ethylacetat)"></textarea>
+          <div class="flex items-center justify-between gap-3 flex-wrap">
+            <p id="statusText" class="text-sm text-slate-500 hidden"></p>
+            <div class="flex gap-3">
+              <button id="analyzeBtn" class="bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 text-white px-5 py-3 rounded-xl shadow-md flex items-center gap-2" onclick="processInput()">
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                Analyse starten
+              </button>
+              <button class="text-slate-500 hover:text-red-600 text-sm" onclick="resetUI()">Zurücksetzen</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="workbenchShell" class="hidden space-y-6">
+      <div class="bg-white/70 backdrop-blur rounded-2xl shadow border border-slate-100 p-4 sm:p-6 flex items-start justify-between gap-4">
+        <div>
+          <p class="text-xs uppercase text-slate-400">Workbench</p>
+          <h2 class="text-2xl font-semibold text-slate-900">Reaktionscockpit</h2>
+          <p class="text-sm text-slate-500">Automatisch extrahierte Stoffe, Stöchiometrie und Sicherheitsinformationen auf einen Blick.</p>
+        </div>
+        <div class="flex flex-col items-end gap-1 text-right">
+          <span class="text-xs uppercase text-slate-400">Kurzfazit</span>
+          <span id="summary" class="text-sm text-blue-700"></span>
+        </div>
+      </div>
+
+      <section class="bg-white/80 backdrop-blur rounded-2xl shadow border border-slate-100 p-4 sm:p-6">
+        <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+          <div>
+            <h3 class="text-lg font-semibold text-slate-900">Stoffliste</h3>
+            <p class="text-sm text-slate-500">Mengen, Rollen und Stöchiometrie – automatisch berechnet.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="addManualRow()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg border border-slate-200 shadow-sm">Manuelle Zeile</button>
+            <span class="text-xs text-slate-500">Manuelle Änderungen sind markiert.</span>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-left text-slate-500 uppercase text-[11px] tracking-wide">
+                <th class="py-2 w-16 text-center">Auswahl</th>
+                <th class="py-2">Rolle</th>
+                <th>Name</th>
+                <th>CAS</th>
+                <th>Formel</th>
+                <th class="text-right">Menge</th>
+                <th class="text-right">Masse (g)</th>
+                <th class="text-right">Stoffmenge (mmol)</th>
+                <th class="text-right">Äquiv.</th>
+                <th class="text-center">Quelle</th>
+                <th class="text-center w-28">Aktion</th>
+              </tr>
+            </thead>
+            <tbody id="componentTable" class="divide-y divide-slate-100"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="bg-white/80 backdrop-blur rounded-2xl shadow border border-slate-100 p-4 sm:p-6">
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <h3 class="text-lg font-semibold text-slate-900">Detailansicht</h3>
+            <p class="text-sm text-slate-500">Stoffdaten kompakt ein- oder ausklappbar.</p>
+          </div>
+        </div>
+        <div id="detailPanel" class="text-sm text-slate-700">Keine Auswahl. Wählen Sie eine Stoffzeile aus, um Details zu sehen.</div>
+      </section>
+
+      <section class="bg-white/80 backdrop-blur rounded-2xl shadow border border-slate-100 p-4 sm:p-6 space-y-4">
+        <div class="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <h3 class="text-lg font-semibold text-slate-900">KI Analyse</h3>
+            <p class="text-sm text-slate-500">GPT-5.1 liefert Zusammenfassung, Sicherheit und Optimierungsvorschläge.</p>
+          </div>
+          <button id="analysisBtn" class="bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600 text-white px-5 py-3 rounded-xl shadow-md flex items-center gap-2" onclick="runReactionAnalysis()">
+            <i class="fa-solid fa-robot"></i>
+            KI-Analyse starten
+          </button>
+        </div>
+        <p id="analysisStatus" class="text-xs text-slate-500 hidden"></p>
+        <div id="analysisPlaceholder" class="border border-dashed border-slate-200 rounded-xl p-4 text-slate-500 bg-slate-50 flex items-center gap-3">
+          <i class="fa-solid fa-wand-magic-sparkles text-amber-500"></i>
+          Nach Start erscheinen hier die Analyse-Karten für Zusammenfassung, Sicherheit und Optimierung.
+        </div>
+        <div id="analysisGrid" class="hidden grid gap-4 md:grid-cols-3">
+          <div class="relative overflow-hidden bg-white border border-blue-100 rounded-xl p-4 shadow-sm">
+            <div class="absolute top-0 right-0 w-16 h-16 bg-blue-50 rounded-bl-full -mr-8 -mt-8"></div>
+            <div class="flex items-center gap-2 text-blue-800 font-semibold mb-2"><i class="fa-solid fa-file-lines"></i> Zusammenfassung</div>
+            <p id="analysisSummary" class="text-sm text-slate-700 leading-relaxed"></p>
+          </div>
+          <div class="relative overflow-hidden bg-white border border-amber-100 rounded-xl p-4 shadow-sm">
+            <div class="absolute top-0 right-0 w-16 h-16 bg-amber-50 rounded-bl-full -mr-8 -mt-8"></div>
+            <div class="flex items-center gap-2 text-amber-800 font-semibold mb-2"><i class="fa-solid fa-shield-halved"></i> Sicherheitshinweise</div>
+            <p id="analysisSafety" class="text-sm text-slate-700 leading-relaxed"></p>
+          </div>
+          <div class="relative overflow-hidden bg-white border border-emerald-100 rounded-xl p-4 shadow-sm">
+            <div class="absolute top-0 right-0 w-16 h-16 bg-emerald-50 rounded-bl-full -mr-8 -mt-8"></div>
+            <div class="flex items-center gap-2 text-emerald-800 font-semibold mb-2"><i class="fa-solid fa-flask-vial"></i> Optimierung</div>
+            <p id="analysisOptimization" class="text-sm text-slate-700 leading-relaxed"></p>
+          </div>
+        </div>
+      </section>
+
+      <section class="bg-white/80 backdrop-blur rounded-2xl shadow border border-slate-100 p-4 sm:p-6 space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-lg font-semibold text-slate-900">Prompts im Einsatz</h3>
+            <p class="text-sm text-slate-500">Alle Eingabeprompts gesammelt – inklusive KI-Analyse.</p>
+          </div>
+          <span class="text-[11px] uppercase text-slate-400">LLM-Steuerung</span>
+        </div>
+        <div class="grid md:grid-cols-3 gap-4">
+          <div class="space-y-2 md:col-span-1">
+            <label class="text-xs uppercase text-slate-400" for="primaryPrompt">Primärer Extraktions-Prompt</label>
+            <textarea id="primaryPrompt" class="w-full border border-slate-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none min-h-[120px] bg-slate-50"></textarea>
+          </div>
+          <div class="space-y-2 md:col-span-1">
+            <label class="text-xs uppercase text-slate-400" for="retryPrompt">Zweiter Prompt (bei PubChem-Fehlschlag)</label>
+            <textarea id="retryPrompt" class="w-full border border-slate-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none min-h-[120px] bg-slate-50"></textarea>
+          </div>
+          <div class="space-y-2 md:col-span-1">
+            <label class="text-xs uppercase text-slate-400" for="analysisPrompt">Prompt für die KI-Analyse</label>
+            <textarea id="analysisPrompt" class="w-full border border-slate-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none min-h-[120px] bg-slate-50" oninput="handleAnalysisPromptChange(event)"></textarea>
+            <p class="text-[11px] text-slate-500">Wird zusammen mit der Detailansicht an GPT-5.1 gesendet.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="bg-white/80 backdrop-blur rounded-2xl shadow border border-slate-100 p-4 sm:p-6">
+        <details class="group" id="debugPanel">
+          <summary class="flex items-center justify-between cursor-pointer">
             <div>
-              <div class="flex items-center justify-between mb-2">
-                <h3 class="font-semibold text-slate-700">UI-Log</h3>
-                <span class="text-xs text-slate-500">Reihenfolge der Schritte</span>
+              <h3 class="text-lg font-semibold text-slate-900">LLM & Log</h3>
+              <p class="text-sm text-slate-500">Debug-Traces, PubChem-Anfragen und UI-Log. Logs laden – kann Minuten dauern.</p>
+            </div>
+            <span class="text-xs text-amber-600 group-open:hidden">⚠️ Logs laden – kann Minuten dauern</span>
+            <span class="text-xs text-blue-700 hidden group-open:inline">Einklappen</span>
+          </summary>
+          <div class="mt-4 space-y-6 border-t border-slate-200 pt-4">
+            <div class="grid md:grid-cols-2 gap-4">
+              <div>
+                <div class="flex items-center justify-between mb-2">
+                  <h4 class="font-semibold text-slate-800">UI-Log</h4>
+                  <span class="text-xs text-slate-500">Reihenfolge der Schritte</span>
+                </div>
+                <div id="logList" class="space-y-2 text-sm text-slate-600 max-h-64 overflow-y-auto"></div>
               </div>
-              <div id="logList" class="space-y-2 text-sm text-slate-600 max-h-64 overflow-y-auto"></div>
+              <div class="space-y-3">
+                <div>
+                  <h4 class="font-semibold text-slate-800">LLM-Trace</h4>
+                  <p class="text-xs text-slate-500">Volle Prompts und Antworten.</p>
+                </div>
+                <div id="llmDebug" class="space-y-2"></div>
+              </div>
             </div>
             <div class="space-y-3">
-              <div>
-                <h3 class="font-semibold text-slate-700">LLM-Trace</h3>
-                <p class="text-xs text-slate-500">Volle Prompts und Antworten.</p>
+              <div class="flex items-center justify-between">
+                <h4 class="font-semibold text-slate-800">PubChem-Trace</h4>
+                <span class="text-xs text-slate-500">Anfragen, Antworten, Fehlversuche</span>
               </div>
-              <div id="llmDebug" class="space-y-2"></div>
+              <div id="pubchemDebug" class="space-y-2"></div>
             </div>
           </div>
-          <div class="space-y-3">
-            <div class="flex items-center justify-between">
-              <h3 class="font-semibold text-slate-700">PubChem-Trace</h3>
-              <span class="text-xs text-slate-500">Anfragen, Antworten, Fehlversuche</span>
-            </div>
-            <div id="pubchemDebug" class="space-y-2"></div>
-          </div>
-        </div>
-      </details>
+        </details>
+      </section>
     </section>
   </main>
 

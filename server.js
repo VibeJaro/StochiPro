@@ -62,6 +62,7 @@ app.post('/api/pubchem-lookup', async (req, res) => {
 app.use(express.static(__dirname));
 
 const port = process.env.PORT || 3000;
-app.listen(port, () => {
-  console.log(`StochiPro läuft auf http://localhost:${port}`);
+const host = '0.0.0.0';
+app.listen(port, host, () => {
+  console.log(`StochiPro läuft auf http://${host}:${port}`);
 });
