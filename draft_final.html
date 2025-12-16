@@ -1,0 +1,454 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Search, 
+  FlaskConical, 
+  Plus, 
+  ChevronDown, 
+  ChevronRight, 
+  Trash2, 
+  MoreHorizontal, 
+  Atom, 
+  Flame, 
+  AlertTriangle, 
+  Skull, 
+  FileText, 
+  Sparkles,
+  Check,
+  X,
+  Droplets,
+  Scale,
+  Thermometer,
+  ShieldAlert,
+  Menu,
+  ArrowRight
+} from 'lucide-react';
+
+// --- Branding ---
+const BRAND_COLOR = '#004A96';
+
+// --- Mock Data ---
+const INITIAL_DATA = [
+  { 
+    id: 1, type: 'reactant', name: "Ethanol", formula: "C2H6O", mw: 46.07, amount: 4.0, unit: "g", mmol: 86.8, eq: 1.0, cas: "64-17-5", 
+    pubchem: {
+      density: "0.789 g/mL", mp: "-114.1 °C", bp: "78.37 °C", 
+      ghs: ["H225", "H319"], signal: "Danger", description: "Clear, colorless liquid with a characteristic vinous odor and pungent taste."
+    }
+  },
+  { 
+    id: 2, type: 'reactant', name: "Essigsäure", formula: "C2H4O2", mw: 60.05, amount: 8.0, unit: "g", mmol: 133.2, eq: 1.53, cas: "64-19-7",
+    pubchem: {
+      density: "1.05 g/mL", mp: "16.6 °C", bp: "117.9 °C", 
+      ghs: ["H226", "H314"], signal: "Danger", description: "Colorless liquid with a strong, pungent, vinegar-like odor."
+    }
+  },
+  { 
+    id: 3, type: 'product', name: "Ethylacetat", formula: "C4H8O2", mw: 88.11, amount: 7.65, unit: "g", mmol: 86.8, eq: null, cas: "141-78-6",
+    pubchem: {
+      density: "0.902 g/mL", mp: "-83.6 °C", bp: "77.1 °C", 
+      ghs: ["H225", "H319", "H336"], signal: "Danger", description: "Colorless liquid with a fruity odor."
+    }
+  }
+];
+
+const AI_ANALYSIS_MOCK = {
+  summary: "Es handelt sich um eine klassische Fischer-Veresterung unter saurer Katalyse. Ethanol ist das limitierende Reagenz.",
+  safety: "Vorsicht bei Essigsäure (ätzend). Arbeiten unter dem Abzug empfohlen. Ethylacetat ist leicht entzündlich.",
+  optimization: "Die Ausbeute könnte durch Zugabe von konz. H2SO4 als Katalysator und Entfernung des entstehenden Wassers (Dean-Stark oder Molsieb) signifikant erhöht werden."
+};
+
+const App = () => {
+  const [appState, setAppState] = useState('input'); // input, processing, workbench
+  const [inputValue, setInputValue] = useState("4 g Ethanol, 8 g Essigsäure, Produkt: Ethylacetat");
+  const [chemicals, setChemicals] = useState([]);
+  const [expandedRow, setExpandedRow] = useState(null);
+  const [showAIAnalysis, setShowAIAnalysis] = useState(false);
+  const [isAnalyzingAI, setIsAnalyzingAI] = useState(false);
+
+  // --- Handlers ---
+
+  const startProcessing = () => {
+    if (!inputValue.trim()) return;
+    setAppState('processing');
+    
+    // Simulate API delay
+    setTimeout(() => {
+      setChemicals(INITIAL_DATA);
+      setAppState('workbench');
+    }, 2000);
+  };
+
+  const handleAddChemical = (e) => {
+    e.preventDefault();
+    // In a real app, this would search PubChem. We'll add a dummy row.
+    const newChem = {
+      id: Date.now(),
+      type: 'reactant',
+      name: "Schwefelsäure (Kat.)",
+      formula: "H2SO4",
+      mw: 98.08,
+      amount: 0.5,
+      unit: "mL",
+      mmol: 9.2,
+      eq: 0.1,
+      cas: "7664-93-9",
+      pubchem: {
+        density: "1.83 g/mL", mp: "10 °C", bp: "337 °C", 
+        ghs: ["H314", "H290"], signal: "Danger", description: "Colorless oily liquid. Corrosive."
+      }
+    };
+    setChemicals([...chemicals, newChem]);
+  };
+
+  const triggerAIAnalysis = () => {
+    setIsAnalyzingAI(true);
+    setShowAIAnalysis(true);
+    setTimeout(() => {
+      setIsAnalyzingAI(false);
+    }, 2500);
+  };
+
+  const toggleRow = (id) => {
+    if (expandedRow === id) {
+      setExpandedRow(null);
+    } else {
+      setExpandedRow(id);
+    }
+  };
+
+  // --- Render Components ---
+
+  // 1. Loading Screen
+  if (appState === 'processing') {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
+        <div className="w-16 h-16 mb-8 relative">
+          <div className="absolute inset-0 rounded-full border-4 border-slate-200"></div>
+          <div className="absolute inset-0 rounded-full border-4 border-t-transparent animate-spin" style={{ borderColor: `${BRAND_COLOR} transparent transparent transparent` }}></div>
+          <FlaskConical className="absolute inset-0 m-auto text-slate-400" size={24} />
+        </div>
+        <h2 className="text-xl font-semibold text-slate-700 mb-2">Analysiere Reaktion...</h2>
+        <div className="flex flex-col gap-2 text-sm text-slate-500 font-mono items-center">
+          <span className="animate-pulse">Extrahiere Entitäten aus Text...</span>
+          <span className="animate-pulse delay-75">Querying PubChem API...</span>
+          <span className="animate-pulse delay-150">Berechne Stöchiometrie...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. Input Screen (Hero)
+  if (appState === 'input') {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col relative overflow-hidden">
+        {/* Abstract Background Decoration */}
+        <div className="absolute top-[-20%] right-[-10%] w-[600px] h-[600px] rounded-full opacity-5 pointer-events-none blur-3xl" style={{ backgroundColor: BRAND_COLOR }}></div>
+        
+        <header className="p-6 flex items-center gap-3 z-10">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg" style={{ backgroundColor: BRAND_COLOR }}>
+            SP
+          </div>
+          <span className="font-bold text-xl text-slate-800 tracking-tight">StochiPro</span>
+        </header>
+
+        <main className="flex-1 flex flex-col items-center justify-center px-4 max-w-4xl mx-auto w-full z-10 -mt-20">
+          <h1 className="text-4xl md:text-5xl font-bold text-slate-900 text-center mb-6 tracking-tight">
+            Chemie verstehen. <br/>
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-700 to-cyan-500">Automatisch berechnet.</span>
+          </h1>
+          
+          <div className="w-full bg-white rounded-2xl shadow-2xl shadow-slate-200/50 border border-slate-100 p-2 transform transition-all hover:scale-[1.01] duration-300">
+            <textarea
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              className="w-full h-32 p-6 text-lg text-slate-700 placeholder-slate-300 bg-transparent border-none outline-none resize-none"
+              placeholder="Beschreiben Sie Ihre Synthese (z.B. 4g Ethanol...)"
+            />
+            <div className="flex justify-between items-center px-4 pb-2">
+               <span className="text-xs font-medium text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                 <Sparkles size={12} /> AI-Powered Engine
+               </span>
+               <button 
+                onClick={startProcessing}
+                className="flex items-center gap-2 px-8 py-3 rounded-xl text-white font-semibold shadow-lg hover:shadow-xl hover:translate-y-[-1px] transition-all active:scale-95"
+                style={{ backgroundColor: BRAND_COLOR }}
+              >
+                Start Analysis <ArrowRight size={18} />
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-8 flex flex-wrap gap-4 justify-center text-sm text-slate-500">
+            <span className="flex items-center gap-1 bg-white px-3 py-1 rounded-full shadow-sm border border-slate-100">
+              <Check size={14} className="text-emerald-500" /> Auto-Stöchiometrie
+            </span>
+            <span className="flex items-center gap-1 bg-white px-3 py-1 rounded-full shadow-sm border border-slate-100">
+              <Check size={14} className="text-emerald-500" /> PubChem Integration
+            </span>
+            <span className="flex items-center gap-1 bg-white px-3 py-1 rounded-full shadow-sm border border-slate-100">
+              <Check size={14} className="text-emerald-500" /> Safety Check
+            </span>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // 3. The Workbench (Main App)
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans">
+      
+      {/* Top Navigation Bar */}
+      <nav className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 sticky top-0 z-40 shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm" style={{ backgroundColor: BRAND_COLOR }}>SP</div>
+          <div className="h-6 w-px bg-slate-200 mx-1"></div>
+          <h1 className="font-semibold text-slate-700">Veresterung von Ethanol</h1>
+          <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded border border-slate-200">Draft</span>
+        </div>
+        <div className="flex items-center gap-4">
+          <button className="p-2 text-slate-400 hover:text-slate-700 transition-colors"><Search size={20} /></button>
+          <button className="p-2 text-slate-400 hover:text-slate-700 transition-colors"><Menu size={20} /></button>
+          <div className="w-8 h-8 rounded-full bg-slate-200 border border-white shadow-sm overflow-hidden">
+             <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="User" />
+          </div>
+        </div>
+      </nav>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+        
+        {/* Section: The Workbench Table */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+              <FlaskConical className="text-slate-400" size={20} /> Reaktionsgemisch
+            </h2>
+            <div className="flex gap-2">
+              <button className="text-sm font-medium text-slate-500 hover:text-slate-800 px-3 py-1.5 transition-colors">Spalten anpassen</button>
+              <button className="flex items-center gap-2 text-sm font-medium text-white px-4 py-1.5 rounded-lg shadow-sm hover:opacity-90 transition-opacity" style={{ backgroundColor: BRAND_COLOR }}>
+                 <Plus size={16} /> Export
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            {/* Table Header */}
+            <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-slate-50/80 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              <div className="col-span-4 md:col-span-3">Substanz</div>
+              <div className="col-span-2 md:col-span-2 text-right">MW</div>
+              <div className="col-span-3 md:col-span-2 text-right">Menge</div>
+              <div className="col-span-3 md:col-span-2 text-right">mmol</div>
+              <div className="hidden md:block md:col-span-1 text-right">Eq.</div>
+              <div className="hidden md:block md:col-span-1 text-right">Info</div>
+              <div className="col-span-1 md:col-span-1"></div>
+            </div>
+
+            {/* Table Body */}
+            <div className="divide-y divide-slate-100">
+              {chemicals.map((chem) => (
+                <div key={chem.id} className="group transition-colors bg-white hover:bg-slate-50">
+                  {/* Main Row */}
+                  <div 
+                    onClick={() => toggleRow(chem.id)}
+                    className="grid grid-cols-12 gap-4 px-6 py-4 items-center cursor-pointer"
+                  >
+                    <div className="col-span-4 md:col-span-3">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-2 h-10 rounded-full ${chem.type === 'reactant' ? 'bg-blue-500' : 'bg-emerald-500'}`}></div>
+                        <div>
+                          <div className="font-bold text-slate-800">{chem.name}</div>
+                          <div className="text-xs text-slate-500 font-mono flex items-center gap-2">
+                             {chem.formula} 
+                             <span className="bg-slate-100 px-1 rounded text-[10px] text-slate-400 border border-slate-200">CAS: {chem.cas}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="col-span-2 md:col-span-2 text-right font-mono text-sm text-slate-600">{chem.mw.toFixed(2)}</div>
+                    
+                    <div className="col-span-3 md:col-span-2 text-right">
+                       <span className="font-bold text-slate-800 bg-slate-100 px-2 py-1 rounded border border-slate-200 tabular-nums">
+                         {chem.amount} <span className="text-slate-500 text-xs font-normal">{chem.unit}</span>
+                       </span>
+                    </div>
+                    
+                    <div className="col-span-3 md:col-span-2 text-right font-mono text-sm text-slate-600 tabular-nums">{chem.mmol.toFixed(1)}</div>
+                    
+                    <div className="hidden md:block md:col-span-1 text-right font-mono text-sm font-semibold text-slate-400 tabular-nums">
+                      {chem.eq ? chem.eq : '-'}
+                    </div>
+
+                    <div className="hidden md:flex md:col-span-1 justify-end items-center gap-2">
+                        {chem.pubchem.ghs.includes('H225') && <Flame size={16} className="text-amber-500" />}
+                        {chem.pubchem.ghs.includes('H314') && <FlaskConical size={16} className="text-red-500" />}
+                    </div>
+
+                    <div className="col-span-1 md:col-span-1 flex justify-end">
+                       <ChevronDown size={18} className={`text-slate-400 transition-transform duration-300 ${expandedRow === chem.id ? 'rotate-180' : ''}`} />
+                    </div>
+                  </div>
+
+                  {/* Expanded Detail Panel */}
+                  <div className={`overflow-hidden transition-all duration-500 ease-in-out ${expandedRow === chem.id ? 'max-h-[500px] opacity-100 border-b border-slate-100' : 'max-h-0 opacity-0'}`}>
+                    <div className="bg-slate-50/50 p-6 grid grid-cols-1 md:grid-cols-3 gap-8">
+                      
+                      {/* Column 1: Physical Props */}
+                      <div className="space-y-3">
+                         <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                           <Atom size={14}/> Physikalische Daten
+                         </h4>
+                         <div className="grid grid-cols-2 gap-y-2 text-sm">
+                            <div className="text-slate-500">Dichte:</div>
+                            <div className="font-mono text-slate-700">{chem.pubchem.density}</div>
+                            <div className="text-slate-500">Schmelzpunkt:</div>
+                            <div className="font-mono text-slate-700">{chem.pubchem.mp}</div>
+                            <div className="text-slate-500">Siedepunkt:</div>
+                            <div className="font-mono text-slate-700">{chem.pubchem.bp}</div>
+                         </div>
+                      </div>
+
+                      {/* Column 2: Description & Structure */}
+                      <div className="space-y-3">
+                         <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                            <FileText size={14}/> Beschreibung
+                         </h4>
+                         <p className="text-sm text-slate-600 leading-relaxed italic">
+                           "{chem.pubchem.description}"
+                         </p>
+                         <div className="mt-2 text-xs text-blue-600 hover:underline cursor-pointer">
+                           View on PubChem ↗
+                         </div>
+                      </div>
+
+                      {/* Column 3: Safety */}
+                      <div className="space-y-3">
+                         <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                            <ShieldAlert size={14}/> Sicherheit (GHS)
+                         </h4>
+                         <div className="flex flex-wrap gap-2">
+                           {chem.pubchem.ghs.map(code => (
+                             <span key={code} className="px-2 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded text-xs font-bold">
+                               {code}
+                             </span>
+                           ))}
+                         </div>
+                         <div className="text-xs font-bold text-red-600 mt-1 uppercase tracking-wide border-l-2 border-red-500 pl-2">
+                           {chem.pubchem.signal}
+                         </div>
+                      </div>
+
+                    </div>
+                    {/* Action Footer for Row */}
+                    <div className="bg-slate-100 px-6 py-2 flex justify-end gap-3 border-t border-slate-200">
+                       <button className="text-xs text-slate-500 hover:text-red-600 flex items-center gap-1"><Trash2 size={12}/> Entfernen</button>
+                       <button className="text-xs font-medium text-slate-600 hover:text-blue-600 flex items-center gap-1">Editieren</button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Quick Add Bar */}
+            <div className="bg-slate-50 p-3 border-t border-slate-200 flex flex-col md:flex-row gap-3 items-center">
+               <div className="relative flex-1 w-full">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                  <input 
+                    type="text" 
+                    placeholder="Chemikalie hinzufügen (Name, CAS, SMILES)..." 
+                    className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                  />
+               </div>
+               <div className="flex gap-2 w-full md:w-auto">
+                 <button 
+                    onClick={handleAddChemical}
+                    className="flex-1 md:flex-none px-4 py-2 bg-white border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm"
+                 >
+                   + Manuell
+                 </button>
+                 <button 
+                    onClick={handleAddChemical}
+                    className="flex-1 md:flex-none px-4 py-2 text-white text-sm font-medium rounded-lg shadow-md hover:shadow-lg transition-all"
+                    style={{ backgroundColor: BRAND_COLOR }}
+                 >
+                   Hinzufügen
+                 </button>
+               </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Section: AI Analysis */}
+        <section>
+          {!showAIAnalysis ? (
+             <div className="bg-gradient-to-r from-slate-800 to-slate-900 rounded-xl p-8 text-center shadow-lg relative overflow-hidden group">
+               <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
+               <div className="relative z-10">
+                 <h3 className="text-xl font-bold text-white mb-2">Deep Analysis</h3>
+                 <p className="text-slate-300 mb-6 max-w-lg mx-auto">
+                   Lassen Sie unsere AI die Reaktion auf Sicherheitsprobleme, Optimierungspotenzial und Plausibilität prüfen.
+                 </p>
+                 <button 
+                   onClick={triggerAIAnalysis}
+                   className="px-6 py-3 bg-white/10 hover:bg-white/20 backdrop-blur border border-white/20 rounded-full text-white font-semibold transition-all flex items-center gap-2 mx-auto group-hover:scale-105"
+                 >
+                   <Sparkles size={18} className="text-yellow-300" /> 
+                   {isAnalyzingAI ? "Analysiere..." : "Analyse generieren"}
+                 </button>
+               </div>
+             </div>
+          ) : (
+             <div className="space-y-4 animate-fade-in-up">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <Sparkles className="text-indigo-500" size={20} /> AI Report
+                  </h3>
+                  <button onClick={() => setShowAIAnalysis(false)} className="text-slate-400 hover:text-slate-600"><X size={18}/></button>
+                </div>
+
+                {isAnalyzingAI ? (
+                  <div className="space-y-4">
+                    <div className="h-24 bg-white rounded-xl shadow-sm border border-slate-100 p-4 animate-pulse">
+                       <div className="h-4 bg-slate-200 rounded w-1/4 mb-4"></div>
+                       <div className="h-2 bg-slate-100 rounded w-full mb-2"></div>
+                       <div className="h-2 bg-slate-100 rounded w-5/6"></div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* Analysis Cards */}
+                    <div className="bg-white rounded-xl p-5 border border-indigo-100 shadow-sm relative overflow-hidden">
+                       <div className="absolute top-0 right-0 w-16 h-16 bg-indigo-50 rounded-bl-full -mr-8 -mt-8"></div>
+                       <h4 className="font-bold text-indigo-900 mb-3 flex items-center gap-2"><FileText size={16}/> Zusammenfassung</h4>
+                       <p className="text-sm text-slate-600 leading-relaxed">{AI_ANALYSIS_MOCK.summary}</p>
+                    </div>
+
+                    <div className="bg-white rounded-xl p-5 border border-amber-100 shadow-sm relative overflow-hidden">
+                       <div className="absolute top-0 right-0 w-16 h-16 bg-amber-50 rounded-bl-full -mr-8 -mt-8"></div>
+                       <h4 className="font-bold text-amber-900 mb-3 flex items-center gap-2"><ShieldAlert size={16}/> Sicherheitshinweise</h4>
+                       <p className="text-sm text-slate-600 leading-relaxed">{AI_ANALYSIS_MOCK.safety}</p>
+                    </div>
+
+                    <div className="bg-white rounded-xl p-5 border border-emerald-100 shadow-sm relative overflow-hidden">
+                       <div className="absolute top-0 right-0 w-16 h-16 bg-emerald-50 rounded-bl-full -mr-8 -mt-8"></div>
+                       <h4 className="font-bold text-emerald-900 mb-3 flex items-center gap-2"><FlaskConical size={16}/> Optimierung</h4>
+                       <p className="text-sm text-slate-600 leading-relaxed">{AI_ANALYSIS_MOCK.optimization}</p>
+                    </div>
+                  </div>
+                )}
+             </div>
+          )}
+        </section>
+
+      </main>
+
+      <style>{`
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in-up { animation: fadeInUp 0.5s ease-out forwards; }
+      `}</style>
+
+    </div>
+  );
+};
+
+export default App;
