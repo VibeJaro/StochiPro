@@ -1,12 +1,14 @@
 const DEFAULT_ANALYSIS_PROMPT = `
 Du bist ein Labor-KI-Assistent, der chemische Reaktionen bewertet.
-Liefere eine kompakte, fachliche Einschätzung mit folgenden Blöcken:
-- Kurzfassung: Reaktion in 1-2 Sätzen zusammenfassen (Edukte ➜ Produkte, Mengen grob einordnen).
-- Sicherheit: Nenne wesentliche Risiken (z. B. GHS-Hinweise, Flammpunkte, Reaktivität) und Sofortmaßnahmen.
-- Optimierung: Mache Vorschläge für schonendere/effizientere Reaktionsführung (Reihenfolge, Temperatur, Alternativen bei Lösemitteln/Katalysatoren).
-- Analytik: Empfiehl geeignete Analytik (z. B. NMR, GC-MS, HPLC, IR, Titration) inkl. sinnvoller Kontrolle der Edukte/Produkte.
-Nutze sowohl den vollständigen Reaktionstext (Ziel, Temperatur, Zeit, Setup, Lösungsmittel, Besonderheiten) als auch die übergebenen Stoffdaten (Name, Rolle, Mengen, physikalische Daten, GHS).
-Antwort klar gegliedert mit Stichpunkten und kurzen Erläuterungen in Deutsch.`;
+Analysiere die Reaktion und antworte ausschließlich mit einem JSON-Objekt folgender Struktur:
+{
+  "summary": "kurze Zusammenfassung der Reaktion in 1-2 Sätzen",
+  "safety": "wichtigste Risiken und Schutzmaßnahmen (GHS, Flammpunkte, Reaktivität)",
+  "optimization": "prägnante Vorschläge zur Optimierung (Reihenfolge, Temperatur, Lösungsmittel/Katalysatoren)"
+}
+Keine zusätzlichen Erklärungen, kein Markdown, kein Fließtext außerhalb dieses JSON.
+Nutze sowohl den Reaktionstext (Ziel, Temperatur, Zeit, Setup, Lösungsmittel, Besonderheiten) als auch die Stoffdaten (Name, Rolle, Mengen, physikalische Daten, GHS).
+Halte die Formulierungen fachlich und knapp in Deutsch.`;
 
 const state = {
   reactionText: '',
@@ -20,7 +22,12 @@ const state = {
   analysis: {
     prompt: DEFAULT_ANALYSIS_PROMPT,
     output: '',
-    status: ''
+    status: '',
+    sections: {
+      summary: '',
+      safety: '',
+      optimization: ''
+    }
   },
   debug: {
     llmCalls: [],
@@ -156,6 +163,26 @@ function setAnalysisStatus(text) {
   }
 }
 
+function toggleLoadingOverlay(show) {
+  const overlay = document.getElementById('loadingOverlay');
+  if (!overlay) return;
+  if (show) {
+    overlay.classList.remove('hidden');
+  } else {
+    overlay.classList.add('hidden');
+  }
+}
+
+function toggleWorkbenchVisibility(show) {
+  const shell = document.getElementById('workbenchShell');
+  if (!shell) return;
+  if (show) {
+    shell.classList.remove('hidden');
+  } else {
+    shell.classList.add('hidden');
+  }
+}
+
 function resetUI() {
   document.getElementById('reactionInput').value = '';
   document.getElementById('primaryPrompt').value = state.prompts.primaryPrompt;
@@ -168,9 +195,16 @@ function resetUI() {
   state.summary = '';
   state.debugLoaded = false;
   state.debugLoading = false;
-  state.analysis = { prompt: state.analysis.prompt || DEFAULT_ANALYSIS_PROMPT, output: '', status: '' };
+  state.analysis = {
+    prompt: state.analysis.prompt || DEFAULT_ANALYSIS_PROMPT,
+    output: '',
+    status: '',
+    sections: { summary: '', safety: '', optimization: '' }
+  };
   state.debug = { llmCalls: [], pubchemCalls: [] };
   document.getElementById('analysisPrompt').value = state.analysis.prompt;
+  toggleWorkbenchVisibility(false);
+  toggleLoadingOverlay(false);
   render();
 }
 
@@ -186,6 +220,32 @@ function escapeHtml(text) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function parseAnalysisSections(payload) {
+  if (!payload) {
+    return { summary: '', safety: '', optimization: '' };
+  }
+
+  const candidate = typeof payload === 'string' ? payload : JSON.stringify(payload);
+  const start = candidate.indexOf('{');
+  const end = candidate.lastIndexOf('}');
+  const slice = start !== -1 && end !== -1 ? candidate.slice(start, end + 1) : candidate;
+
+  try {
+    const parsed = typeof payload === 'object' && !Array.isArray(payload) ? payload : JSON.parse(slice);
+    if (parsed && typeof parsed === 'object') {
+      return {
+        summary: parsed.summary || '',
+        safety: parsed.safety || '',
+        optimization: parsed.optimization || ''
+      };
+    }
+  } catch (error) {
+    // ignore parsing errors; caller will handle empty fields
+  }
+
+  return { summary: '', safety: '', optimization: '' };
 }
 
 function renderMarkdown(text) {
@@ -772,16 +832,33 @@ function renderSummary() {
 }
 
 function renderAnalysis() {
-  const output = document.getElementById('analysisOutput');
   const prompt = document.getElementById('analysisPrompt');
   const status = document.getElementById('analysisStatus');
-  if (!output || !prompt || !status) return;
+  const grid = document.getElementById('analysisGrid');
+  const placeholder = document.getElementById('analysisPlaceholder');
+  const summaryEl = document.getElementById('analysisSummary');
+  const safetyEl = document.getElementById('analysisSafety');
+  const optimizationEl = document.getElementById('analysisOptimization');
 
-  output.innerHTML = state.analysis.output
-    ? renderMarkdown(state.analysis.output)
-    : '<p class="text-slate-500">Noch keine Analyse gestartet.</p>';
+  if (!prompt || !status || !grid || !placeholder) return;
+
   if (prompt.value !== state.analysis.prompt) {
     prompt.value = state.analysis.prompt;
+  }
+
+  const sections = state.analysis.sections || { summary: '', safety: '', optimization: '' };
+  const hasContent = Object.values(sections).some((value) => (value || '').trim());
+
+  if (summaryEl) summaryEl.textContent = sections.summary || 'Noch keine Zusammenfassung vorhanden.';
+  if (safetyEl) safetyEl.textContent = sections.safety || 'Noch keine Sicherheitshinweise vorhanden.';
+  if (optimizationEl) optimizationEl.textContent = sections.optimization || 'Noch keine Optimierungsvorschläge vorhanden.';
+
+  if (hasContent) {
+    grid.classList.remove('hidden');
+    placeholder.classList.add('hidden');
+  } else {
+    grid.classList.add('hidden');
+    placeholder.classList.remove('hidden');
   }
 
   if (state.analysis.status) {
@@ -929,6 +1006,7 @@ function handleAnalysisPromptChange(event) {
 async function runReactionAnalysis() {
   if (!state.components.length) {
     state.analysis.output = '';
+    state.analysis.sections = { summary: '', safety: '', optimization: '' };
     setAnalysisStatus('Keine Stoffdaten geladen – bitte zuerst die Reaktion analysieren.');
     renderAnalysis();
     return;
@@ -957,6 +1035,10 @@ async function runReactionAnalysis() {
 
     const data = await response.json();
     state.analysis.output = data.analysis || 'Keine Antwort erhalten.';
+    state.analysis.sections = parseAnalysisSections(data.structuredAnalysis || data.analysis);
+    if (!Object.values(state.analysis.sections).some((value) => (value || '').trim())) {
+      state.analysis.sections = parseAnalysisSections(state.analysis.output);
+    }
     const latestNonAnswerLog = (data.logs || [])
       .slice()
       .reverse()
@@ -1081,7 +1163,10 @@ async function processInput() {
   state.prompts.retryPrompt = document.getElementById('retryPrompt').value || state.prompts.retryPrompt;
   state.analysis.prompt = document.getElementById('analysisPrompt').value || state.analysis.prompt;
   state.analysis.output = '';
+  state.analysis.sections = { summary: '', safety: '', optimization: '' };
   setAnalysisStatus('KI-Analyse wartet auf manuellen Start.');
+
+  toggleLoadingOverlay(true);
 
   const btn = document.getElementById('analyzeBtn');
   btn.disabled = true;
@@ -1116,6 +1201,7 @@ async function processInput() {
     state.debug = data.debug || { llmCalls: [], pubchemCalls: [] };
     state.detailExpanded = false;
     state.selected = state.components.length ? 0 : null;
+    toggleWorkbenchVisibility(Boolean(state.components.length));
     render();
     setStatus('Analyse abgeschlossen.');
   } catch (error) {
@@ -1124,6 +1210,7 @@ async function processInput() {
   } finally {
     btn.disabled = false;
     btn.classList.remove('opacity-70');
+    toggleLoadingOverlay(false);
     setTimeout(() => setStatus(''), 2000);
   }
 }
